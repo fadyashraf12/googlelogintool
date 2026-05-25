@@ -37,12 +37,34 @@ def _xclip_write(text):
     )
 
 def find_browser_window():
-    """Return the XID of the topmost visible Chrome/Chromium window, or None."""
-    for pattern in ["Chromium", "Google Chrome", "chrome"]:
+    """
+    Return the XID of any visible browser window the user has open.
+    Searches by window class (most reliable), then by title keywords.
+    Supports Chrome, Firefox, Brave, Edge, Opera, Vivaldi, Chromium, etc.
+    """
+    # Search by WM_CLASS — works for all major browsers
+    class_patterns = [
+        "Google-chrome", "google-chrome",
+        "Chromium", "chromium",
+        "Firefox", "firefox", "Navigator",
+        "Brave-browser", "brave-browser",
+        "Microsoft-edge", "microsoft-edge",
+        "Opera", "opera",
+        "Vivaldi", "vivaldi",
+        "Epiphany",  # GNOME Web
+    ]
+    for cls in class_patterns:
+        r = _xdo("search", "--onlyvisible", "--class", cls)
+        if r.returncode == 0 and r.stdout.strip():
+            return r.stdout.strip().split("\n")[-1].strip()
+
+    # Fallback: search by window name/title
+    for pattern in ["Google Chrome", "Chromium", "Mozilla Firefox",
+                    "Brave", "Microsoft Edge", "Opera"]:
         r = _xdo("search", "--onlyvisible", "--name", pattern)
         if r.returncode == 0 and r.stdout.strip():
-            ids = r.stdout.strip().split("\n")
-            return ids[-1].strip()
+            return r.stdout.strip().split("\n")[-1].strip()
+
     return None
 
 def get_window_title(wid):

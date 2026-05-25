@@ -169,29 +169,23 @@ class App(ctk.CTk):
         tab_auto = tabview.tab("⚡  Automation")
         tab_auto.grid_columnconfigure(0, weight=1)
 
-        # STEP 1 — Launch your real browser
+        # STEP 1 — Browser detection
         step1_card = ctk.CTkFrame(tab_auto, fg_color="#151821", corner_radius=10)
         step1_card.pack(fill="x", padx=5, pady=(8, 6))
 
-        ctk.CTkLabel(step1_card, text="STEP 1 — Open Your Browser",
+        ctk.CTkLabel(step1_card, text="STEP 1 — Open Any Browser",
                      font=("Segoe UI", 13, "bold"), text_color="#6366f1"
                      ).pack(anchor="w", padx=12, pady=(10, 2))
 
         ctk.CTkLabel(step1_card,
-                     text="Click below to open Chromium with your real profile.\n"
-                          "Sessions and cookies will be saved between uses.",
+                     text="Open Chrome, Firefox, Brave — any browser — in the\n"
+                          "VNC viewer above. The bot will open a new tab in it\n"
+                          "and control it with mouse & keyboard.",
                      font=("Segoe UI", 10), text_color="#64748b", justify="left"
-                     ).pack(anchor="w", padx=12, pady=(0, 6))
-
-        self.chrome_btn = ctk.CTkButton(
-            step1_card, text="🌐  Launch Chrome",
-            command=self.launch_chrome_browser,
-            height=38, font=("Segoe UI", 13, "bold"),
-            fg_color="#4f46e5", hover_color="#4338ca")
-        self.chrome_btn.pack(fill="x", padx=12, pady=(0, 8))
+                     ).pack(anchor="w", padx=12, pady=(0, 8))
 
         status_row = ctk.CTkFrame(step1_card, fg_color="#0f172a", corner_radius=6)
-        status_row.pack(fill="x", padx=12, pady=(0, 10))
+        status_row.pack(fill="x", padx=12, pady=(0, 6))
 
         self.chrome_dot = ctk.CTkLabel(
             status_row, text="●", font=("Segoe UI", 18),
@@ -200,9 +194,17 @@ class App(ctk.CTk):
 
         self.chrome_status_lbl = ctk.CTkLabel(
             status_row,
-            text="Browser: not detected",
+            text="Waiting for a browser window...",
             font=("Segoe UI", 11), text_color="#f87171", anchor="w")
         self.chrome_status_lbl.pack(side="left", pady=6)
+
+        self.chrome_btn = ctk.CTkButton(
+            step1_card, text="🌐  No browser? Launch one here",
+            command=self.launch_chrome_browser,
+            height=32, font=("Segoe UI", 11),
+            fg_color="#1e293b", hover_color="#334155",
+            border_width=1, border_color="#475569")
+        self.chrome_btn.pack(fill="x", padx=12, pady=(0, 10))
 
         # STEP 2 — Run automation
         step2_card = ctk.CTkFrame(tab_auto, fg_color="#151821", corner_radius=10)
