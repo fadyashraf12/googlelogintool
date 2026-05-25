@@ -697,10 +697,14 @@ class App(ctk.CTk):
     # ==========================
 
     def poll_chrome_status(self):
-        """Check CDP port every 3 s and update the status indicator."""
+        """Check CDP port every 3 s in a background thread so the UI never freezes."""
         port = config.load().get("cdp_port", 9222)
-        connected = chrome_launcher.is_chrome_debug_running(port)
-        self._update_chrome_status(connected, port)
+
+        def _check():
+            connected = chrome_launcher.is_chrome_debug_running(port)
+            self.after(0, lambda: self._update_chrome_status(connected, port))
+
+        threading.Thread(target=_check, daemon=True).start()
         self.after(3000, self.poll_chrome_status)
 
     def _update_chrome_status(self, connected: bool, port: int):

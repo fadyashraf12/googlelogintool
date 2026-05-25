@@ -134,13 +134,18 @@ def launch_chrome(port: int = 9222) -> tuple[bool, str]:
 
     try:
         # Detach the subprocess so it outlives this process
-        subprocess.Popen(
-            flags,
+        kwargs = dict(
             env=env,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             start_new_session=True,
         )
+        # On Windows, suppress the black console window that would otherwise pop up
+        if sys.platform.startswith("win"):
+            kwargs["creationflags"] = (
+                subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS
+            )
+        subprocess.Popen(flags, **kwargs)
         return True, "launched"
     except Exception as exc:
         return False, f"Failed to launch browser: {exc}"
