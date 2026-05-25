@@ -11,6 +11,7 @@ import customtkinter as ctk
 import datetime
 import subprocess
 import config
+import chrome_launcher
 
 from database import (
     init_db,
@@ -42,8 +43,10 @@ class App(ctk.CTk):
         self.account_vars = []
         self.selected_edit_id = None
         self.stop_event = threading.Event()
+        self._browser_open = False
 
         self.build_ui()
+        self.after(500, self.poll_browser_status)
 
     def build_ui(self):
         # Configure layout grid (1 Row, 2 Columns)
@@ -166,34 +169,40 @@ class App(ctk.CTk):
         tab_auto = tabview.tab("⚡  Automation")
         tab_auto.grid_columnconfigure(0, weight=1)
 
-        # STEP 1 — Ready indicator (browser is launched automatically)
+        # STEP 1 — Launch your real browser
         step1_card = ctk.CTkFrame(tab_auto, fg_color="#151821", corner_radius=10)
         step1_card.pack(fill="x", padx=5, pady=(8, 6))
 
-        step1_hdr = ctk.CTkFrame(step1_card, fg_color="transparent")
-        step1_hdr.pack(fill="x", padx=12, pady=(10, 4))
-
-        ctk.CTkLabel(step1_hdr, text="STEP 1 — Browser",
+        ctk.CTkLabel(step1_card, text="STEP 1 — Open Your Browser",
                      font=("Segoe UI", 13, "bold"), text_color="#6366f1"
-                     ).pack(side="left")
-
-        status_row = ctk.CTkFrame(step1_card, fg_color="#0f172a", corner_radius=6)
-        status_row.pack(fill="x", padx=12, pady=(0, 8))
-
-        ctk.CTkLabel(
-            status_row, text="●", font=("Segoe UI", 20),
-            text_color="#22c55e", width=28
-        ).pack(side="left", padx=(10, 4), pady=8)
-
-        ctk.CTkLabel(
-            status_row, text="Browser launches automatically when you start",
-            font=("Segoe UI", 12, "bold"), text_color="#22c55e", anchor="w"
-        ).pack(side="left", pady=8)
+                     ).pack(anchor="w", padx=12, pady=(10, 2))
 
         ctk.CTkLabel(step1_card,
-                     text="No setup needed — the bot opens its own browser window.",
-                     font=("Segoe UI", 10), text_color="#64748b"
-                     ).pack(anchor="w", padx=12, pady=(0, 12))
+                     text="Click below to open Chromium with your real profile.\n"
+                          "Sessions and cookies will be saved between uses.",
+                     font=("Segoe UI", 10), text_color="#64748b", justify="left"
+                     ).pack(anchor="w", padx=12, pady=(0, 6))
+
+        self.chrome_btn = ctk.CTkButton(
+            step1_card, text="🌐  Launch Chrome",
+            command=self.launch_chrome_browser,
+            height=38, font=("Segoe UI", 13, "bold"),
+            fg_color="#4f46e5", hover_color="#4338ca")
+        self.chrome_btn.pack(fill="x", padx=12, pady=(0, 8))
+
+        status_row = ctk.CTkFrame(step1_card, fg_color="#0f172a", corner_radius=6)
+        status_row.pack(fill="x", padx=12, pady=(0, 10))
+
+        self.chrome_dot = ctk.CTkLabel(
+            status_row, text="●", font=("Segoe UI", 18),
+            text_color="#ef4444", width=28)
+        self.chrome_dot.pack(side="left", padx=(10, 4), pady=6)
+
+        self.chrome_status_lbl = ctk.CTkLabel(
+            status_row,
+            text="Browser: not detected",
+            font=("Segoe UI", 11), text_color="#f87171", anchor="w")
+        self.chrome_status_lbl.pack(side="left", pady=6)
 
         # STEP 2 — Run automation
         step2_card = ctk.CTkFrame(tab_auto, fg_color="#151821", corner_radius=10)
@@ -616,7 +625,7 @@ class App(ctk.CTk):
 
     def update_login_button(self):
         selected = any(var.get() for var, acc in self.account_vars)
-        ready = selected and not self.stop_event.is_set()
+        ready = selected and self._browser_open and not self.stop_event.is_set()
         self.start_btn.configure(state="normal" if ready else "disabled")
 
     def start_login_process(self):
@@ -656,6 +665,106 @@ class App(ctk.CTk):
 
     def open_settings(self):
         SettingsDialog(self)
+
+    # ==========================
+    # BROWSER DETECTION & LAUNCH
+    # ==========================
+
+    def poll_browser_status(self):
+        """Check every 3 s (background thread) whether a browser window is visible."""
+        from login_bot import find_browser_window
+
+        def _check():
+            wid = find_browser_window()
+            self.after(0, lambda: self._update_browser_status(bool(wid)))
+
+        threading.Thread(target=_check, daemon=True).start()
+        self.after(3000, self.poll_browser_status)
+
+    def _update_browser_status(self, is_open: bool):
+        prev = self._browser_open
+        self._browser_open = is_open
+
+        if is_open:
+            self.chrome_dot.configure(text_color="#22c55e")
+            self.chrome_status_lbl.configure(
+                text="Browser: open and ready ✔",
+                text_color="#22c55e")
+            self.chrome_btn.configure(
+                text="✔  Browser Running",
+                fg_color="#14532d", hover_color="#166534")
+            if not prev:
+                self.add_log("✔ Browser window detected — ready to automate.")
+        else:
+            self.chrome_dot.configure(text_color="#ef4444")
+            self.chrome_status_lbl.configure(
+                text="Browser: not detected",
+                text_color="#f87171")
+            self.chrome_btn.configure(
+                text="🌐  Launch Chrome",
+                fg_color="#4f46e5", hover_color="#4338ca")
+            if prev:
+                self.add_log("✘ Browser window closed.")
+
+        self.update_login_button()
+
+    def launch_chrome_browser(self):
+        """Launch Chromium with a persistent user-data-dir so sessions are saved."""
+        self.add_log("Launching browser with persistent profile...")
+        self.chrome_btn.configure(state="disabled", text="Launching…")
+
+        def _do():
+            import time
+            exe, _ = chrome_launcher.find_chrome_executable()
+            if not exe:
+                self.after(0, lambda: self.add_log(
+                    "✘ Could not find Chrome/Chromium on this system."))
+                self.after(0, lambda: self.chrome_btn.configure(state="normal"))
+                return
+
+            env = os.environ.copy()
+            env.setdefault("DISPLAY", ":99")
+            profile_dir = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), "chrome-profile")
+
+            try:
+                subprocess.Popen(
+                    [exe,
+                     "--no-sandbox",
+                     "--disable-dev-shm-usage",
+                     "--disable-gpu",
+                     "--no-first-run",
+                     "--no-default-browser-check",
+                     f"--user-data-dir={profile_dir}"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    env=env,
+                    start_new_session=True,
+                )
+                self.after(0, lambda: self.add_log(
+                    f"✔ Browser launched with persistent profile.\n"
+                    f"   Profile saved at: {profile_dir}"))
+            except Exception as exc:
+                self.after(0, lambda: self.add_log(f"✘ Launch failed: {exc}"))
+                self.after(0, lambda: self.chrome_btn.configure(state="normal"))
+                return
+
+            # Poll until window appears (up to 15 s)
+            from login_bot import find_browser_window
+            for _ in range(15):
+                time.sleep(1)
+                wid = find_browser_window()
+                if wid:
+                    self.after(0, lambda: self._update_browser_status(True))
+                    break
+            else:
+                self.after(0, lambda: self.add_log(
+                    "⚠ Browser launched but window not yet detected. "
+                    "It will be found on the next status check."))
+
+            self.after(0, lambda: self.chrome_btn.configure(state="normal"))
+
+        threading.Thread(target=_do, daemon=True).start()
 
 
 # ──────────────────────────────────────────────────────────────────────────────

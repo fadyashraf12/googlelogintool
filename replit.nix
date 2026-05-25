@@ -1,5 +1,7 @@
 {pkgs}: {
   deps = [
+    pkgs.xclip
+    pkgs.xdotool
     pkgs.python312Packages.tkinter
     pkgs.xvfb-run
     pkgs.xorg.libxcb
