@@ -1,6 +1,7 @@
 import threading
 import customtkinter as ctk
 import datetime
+import subprocess
 
 from database import (
     init_db,
@@ -221,8 +222,8 @@ class App(ctk.CTk):
 
         self.chrome_btn = ctk.CTkButton(
             engine_frame, 
-            text="Launch Debug Chrome Profile", 
-            command=self.launch_manual_chrome,
+            text="Create Debug Shortcut", 
+            command=self.create_debug_shortcut,
             height=38,
             font=("Segoe UI", 13, "bold"),
             fg_color="#4f46e5",
@@ -645,20 +646,19 @@ class App(ctk.CTk):
         self.load_accounts()
         self.add_log("Automation batch flow ended.")
 
-    def launch_manual_chrome(self):
-        self.add_log("Launching debug Chrome session in isolated environment...")
-        self.chrome_btn.configure(state="disabled")
-
-        def run():
-            from login_bot import start_chrome
-            try:
-                start_chrome(self.add_log)
-            except Exception as e:
-                self.add_log(f"Failed to start Chrome manually: {e}")
-            finally:
-                self.after(0, lambda: self.chrome_btn.configure(state="normal"))
-
-        threading.Thread(target=run, daemon=True).start()
+    def create_debug_shortcut(self):
+        self.add_log("Running script to create the debug shortcut on your Desktop...")
+        try:
+            # Using powershell to execute the script
+            subprocess.run(["powershell", "-ExecutionPolicy", "Bypass", "-File", ".\\update_chrome_shortcut.ps1"], check=True)
+            self.add_log("SUCCESS: 'Google Chrome (Debug)' shortcut created on your Desktop.")
+            self.add_log("Please close all Chrome windows and use this new shortcut to start Chrome.")
+        except FileNotFoundError:
+            self.add_log("ERROR: 'update_chrome_shortcut.ps1' not found.")
+        except subprocess.CalledProcessError as e:
+            self.add_log(f"ERROR: Failed to create shortcut. Script failed with error: {e}")
+        except Exception as e:
+            self.add_log(f"An unexpected error occurred: {e}")
 
 
 if __name__ == "__main__":
