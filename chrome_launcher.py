@@ -222,12 +222,15 @@ def launch_chrome(port: int = 9222) -> tuple[bool, str]:
         "--no-default-browser-check",
     ]
 
-    # Required flags for running inside a Linux container / sandbox environment
+    # Required flags for running inside a Linux container / sandbox environment.
+    # --user-data-dir is critical: without it Chromium crashes before binding the
+    # debug port because it cannot locate or write to the default profile directory.
     if sys.platform.startswith("linux"):
         flags += [
             "--no-sandbox",
             "--disable-dev-shm-usage",
             "--disable-gpu",
+            "--user-data-dir=/tmp/chrome-debug-profile",
         ]
 
     env = os.environ.copy()
