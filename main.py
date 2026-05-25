@@ -11,6 +11,7 @@ import customtkinter as ctk
 import datetime
 import subprocess
 import config
+import chrome_launcher
 
 from database import (
     init_db,
@@ -229,17 +230,34 @@ class App(ctk.CTk):
         )
         self.stop_btn.pack(fill="x", padx=10, pady=5)
 
+        # Chrome status row (dot + label)
+        chrome_status_row = ctk.CTkFrame(engine_frame, fg_color="transparent")
+        chrome_status_row.pack(fill="x", padx=10, pady=(8, 2))
+
+        self.chrome_dot = ctk.CTkLabel(
+            chrome_status_row, text="●",
+            font=("Segoe UI", 14),
+            text_color="#64748b", width=18
+        )
+        self.chrome_dot.pack(side="left")
+
+        self.chrome_status_lbl = ctk.CTkLabel(
+            chrome_status_row, text="Chrome: checking…",
+            font=("Segoe UI", 11), text_color="#94a3b8", anchor="w"
+        )
+        self.chrome_status_lbl.pack(side="left", padx=4)
+
+        # Launch / Connect button
         self.chrome_btn = ctk.CTkButton(
-            engine_frame, 
-            text="Create Debug Shortcut", 
-            command=self.create_debug_shortcut,
+            engine_frame,
+            text="Launch Chrome",
+            command=self.launch_chrome_browser,
             height=38,
             font=("Segoe UI", 13, "bold"),
             fg_color="#4f46e5",
             hover_color="#4338ca",
-            text_color_disabled="#c7d2fe"
         )
-        self.chrome_btn.pack(fill="x", padx=10, pady=5)
+        self.chrome_btn.pack(fill="x", padx=10, pady=(2, 5))
 
         self.settings_btn = ctk.CTkButton(
             engine_frame,
@@ -256,6 +274,9 @@ class App(ctk.CTk):
 
         # Set initial input field states
         self.update_phone_fields()
+
+        # Kick off the Chrome status poller (runs every 3 s)
+        self.after(500, self.poll_chrome_status)
 
         # ==========================
         # RIGHT PANEL: GRID & LOGS
@@ -671,19 +692,69 @@ class App(ctk.CTk):
     def open_settings(self):
         SettingsDialog(self)
 
-    def create_debug_shortcut(self):
-        self.add_log("Running script to create the debug shortcut on your Desktop...")
-        try:
-            # Using powershell to execute the script
-            subprocess.run(["powershell", "-ExecutionPolicy", "Bypass", "-File", ".\\update_chrome_shortcut.ps1"], check=True)
-            self.add_log("SUCCESS: 'Google Chrome (Debug)' shortcut created on your Desktop.")
-            self.add_log("Please close all Chrome windows and use this new shortcut to start Chrome.")
-        except FileNotFoundError:
-            self.add_log("ERROR: 'update_chrome_shortcut.ps1' not found.")
-        except subprocess.CalledProcessError as e:
-            self.add_log(f"ERROR: Failed to create shortcut. Script failed with error: {e}")
-        except Exception as e:
-            self.add_log(f"An unexpected error occurred: {e}")
+    # ==========================
+    # CHROME AUTO-LAUNCH
+    # ==========================
+
+    def poll_chrome_status(self):
+        """Check CDP port every 3 s and update the status indicator."""
+        port = config.load().get("cdp_port", 9222)
+        connected = chrome_launcher.is_chrome_debug_running(port)
+        self._update_chrome_status(connected, port)
+        self.after(3000, self.poll_chrome_status)
+
+    def _update_chrome_status(self, connected: bool, port: int):
+        if connected:
+            self.chrome_dot.configure(text_color="#22c55e")          # green
+            self.chrome_status_lbl.configure(
+                text=f"Chrome: connected  (port {port})",
+                text_color="#22c55e"
+            )
+            self.chrome_btn.configure(
+                text="Chrome Connected ✔",
+                fg_color="#14532d",
+                hover_color="#166534",
+                state="disabled"
+            )
+        else:
+            self.chrome_dot.configure(text_color="#ef4444")          # red
+            self.chrome_status_lbl.configure(
+                text=f"Chrome: not running  (port {port})",
+                text_color="#f87171"
+            )
+            self.chrome_btn.configure(
+                text="Launch Chrome",
+                fg_color="#4f46e5",
+                hover_color="#4338ca",
+                state="normal"
+            )
+
+    def launch_chrome_browser(self):
+        """Detect Chrome, launch it if missing, and report in the log."""
+        port = config.load().get("cdp_port", 9222)
+        self.add_log(f"Checking Chrome on port {port}…")
+
+        # Run in a thread so the UI stays responsive
+        def _do_launch():
+            ok, msg = chrome_launcher.launch_chrome(port)
+            if msg == "already_running":
+                self.after(0, lambda: self.add_log(
+                    f"Chrome is already running with debug port {port}."
+                ))
+            elif ok:
+                self.after(0, lambda: self.add_log(
+                    "Chrome launched successfully with "
+                    f"--remote-debugging-port={port}.\n"
+                    "Waiting for it to start…"
+                ))
+                # Give the browser a moment then refresh status
+                import time
+                time.sleep(3)
+                self.after(0, lambda: self.poll_chrome_status())
+            else:
+                self.after(0, lambda: self.add_log(f"✘ {msg}"))
+
+        threading.Thread(target=_do_launch, daemon=True).start()
 
 
 # ──────────────────────────────────────────────────────────────────────────────
