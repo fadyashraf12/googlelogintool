@@ -5,16 +5,7 @@ import traceback
 import pyotp
 from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
 from database import update_account_status
-
-# ============================================================
-# CONNECTION CONFIG
-# ============================================================
-# Connects to an already-running Chrome instance launched with:
-#   --remote-debugging-port=9222
-CDP_ENDPOINT = "http://localhost:9222"
-
-# How long (seconds) to wait for the user to complete manual 2FA
-MANUAL_2FA_TIMEOUT = 120
+import config
 
 
 # ============================================================
@@ -152,14 +143,16 @@ _ADJACENT = {
     's': 'ad', 't': 'ry', 'u': 'yi', 'v': 'cb', 'w': 'qe', 'x': 'zc',
     'y': 'tu', 'z': 'x',
 }
-_TYPO_RATE = 0.03  # 3 % chance of a typo per character
-
-
 def human_type(page, selector, text, stop_event=None, clear_first=True):
     """
     Click on the field then type each character with randomised inter-key
     delays. Occasionally introduces a typo and corrects it with Backspace.
+    Delay range and typo rate are read live from config.
     """
+    # Read settings fresh each call so changes take effect immediately
+    key_min, key_max = config.get_typing_delays()
+    typo_rate = config.get_typo_rate()
+
     try:
         el = page.locator(selector).first
         el.wait_for(state="visible", timeout=8000)
@@ -180,7 +173,7 @@ def human_type(page, selector, text, stop_event=None, clear_first=True):
                 return True
 
             # Occasional typo
-            if char.isalpha() and random.random() < _TYPO_RATE:
+            if char.isalpha() and random.random() < typo_rate:
                 candidates = _ADJACENT.get(char.lower(), "")
                 if candidates:
                     wrong = random.choice(candidates)
@@ -189,11 +182,11 @@ def human_type(page, selector, text, stop_event=None, clear_first=True):
                     page.keyboard.type(wrong)
                     time.sleep(random.uniform(0.08, 0.18))
                     page.keyboard.press("Backspace")
-                    time.sleep(random.uniform(0.05, 0.14))
+                    time.sleep(random.uniform(0.05, key_max))
 
             page.keyboard.type(char)
-            # Natural inter-key delay
-            time.sleep(random.uniform(0.04, 0.14))
+            # Natural inter-key delay (from config)
+            time.sleep(random.uniform(key_min, key_max))
 
             # Occasional micro-pause (thinking pause)
             if random.random() < 0.04:
@@ -418,15 +411,16 @@ def handle_totp_2fa(page, totp_secret, log_callback=None, stop_event=None):
 def handle_manual_2fa(page, method, log_callback=None, stop_event=None):
     """
     For SMS / Email / Google Prompt 2FA: wait for the user to complete
-    verification in the browser window.  Polls for MANUAL_2FA_TIMEOUT secs.
+    verification in the browser window.  Polls for config.get_twofa_timeout() secs.
     """
+    timeout_secs = config.get_twofa_timeout()
     if log_callback:
         log_callback(
             f"  ⚠ {method} 2FA detected — please complete verification "
-            f"in the browser window within {MANUAL_2FA_TIMEOUT}s..."
+            f"in the browser window within {timeout_secs}s..."
         )
 
-    deadline = time.time() + MANUAL_2FA_TIMEOUT
+    deadline = time.time() + timeout_secs
     while time.time() < deadline:
         if check_stop(stop_event):
             return False
@@ -438,7 +432,7 @@ def handle_manual_2fa(page, method, log_callback=None, stop_event=None):
         time.sleep(1.0)
 
     if log_callback:
-        log_callback(f"  ✦ 2FA timeout ({MANUAL_2FA_TIMEOUT}s) — skipping account.")
+        log_callback(f"  ✦ 2FA timeout ({timeout_secs}s) — skipping account.")
     return False
 
 
@@ -623,12 +617,14 @@ def login_accounts(accounts, log_callback=None, stop_event=None):
     with sync_playwright() as p:
         # ── Connect to existing Chrome instance ───────────────────────
         try:
-            browser = p.chromium.connect_over_cdp(CDP_ENDPOINT)
+            cdp_endpoint = config.get_cdp_endpoint()
+            browser = p.chromium.connect_over_cdp(cdp_endpoint)
             context = browser.contexts[0]
             log("✔ Connected to your running Chrome browser.")
         except Exception:
+            cdp_port = config.load().get("cdp_port", 9222)
             log("✘ CRITICAL: Could not connect to Chrome.")
-            log(f"  Chrome must be running with:  --remote-debugging-port=9222")
+            log(f"  Chrome must be running with:  --remote-debugging-port={cdp_port}")
             log("")
             log("  How to set this up:")
             log("  • Windows: Right-click the Chrome shortcut → Properties")
@@ -691,7 +687,8 @@ def login_accounts(accounts, log_callback=None, stop_event=None):
 
             # Gap between accounts so it doesn't look like a bot
             if idx < total and not check_stop(stop_event):
-                gap = random.uniform(3.0, 7.0)
+                gap_min, gap_max = config.get_account_gap()
+                gap = random.uniform(gap_min, gap_max)
                 log(f"  Waiting {gap:.1f}s before next account...")
                 interruptible_sleep(gap, stop_event)
 

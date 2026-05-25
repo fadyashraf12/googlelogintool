@@ -10,6 +10,7 @@ import threading
 import customtkinter as ctk
 import datetime
 import subprocess
+import config
 
 from database import (
     init_db,
@@ -239,6 +240,19 @@ class App(ctk.CTk):
             text_color_disabled="#c7d2fe"
         )
         self.chrome_btn.pack(fill="x", padx=10, pady=5)
+
+        self.settings_btn = ctk.CTkButton(
+            engine_frame,
+            text="⚙  Settings",
+            command=self.open_settings,
+            height=35,
+            font=("Segoe UI", 12),
+            fg_color="#1e293b",
+            hover_color="#334155",
+            border_width=1,
+            border_color="#334155",
+        )
+        self.settings_btn.pack(fill="x", padx=10, pady=(2, 8))
 
         # Set initial input field states
         self.update_phone_fields()
@@ -654,6 +668,9 @@ class App(ctk.CTk):
         self.load_accounts()
         self.add_log("Automation batch flow ended.")
 
+    def open_settings(self):
+        SettingsDialog(self)
+
     def create_debug_shortcut(self):
         self.add_log("Running script to create the debug shortcut on your Desktop...")
         try:
@@ -667,6 +684,254 @@ class App(ctk.CTk):
             self.add_log(f"ERROR: Failed to create shortcut. Script failed with error: {e}")
         except Exception as e:
             self.add_log(f"An unexpected error occurred: {e}")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# SETTINGS DIALOG
+# ──────────────────────────────────────────────────────────────────────────────
+
+class SettingsDialog(ctk.CTkToplevel):
+    """
+    Modal settings window.  All values read from / saved to settings.json
+    via the config module so the bot picks them up without a restart.
+    """
+
+    _BG       = "#1e222b"
+    _CARD     = "#151821"
+    _ACCENT   = "#3b82f6"
+    _MUTED    = "#64748b"
+    _TEXT     = "#e2e8f0"
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.title("⚙  Settings")
+        self.geometry("520x640")
+        self.resizable(False, False)
+        self.configure(fg_color=self._BG)
+        self.grab_set()           # make modal
+        self.focus_force()
+
+        # Load current settings
+        self._s = config.load()
+
+        self._build_ui()
+        self._populate()
+
+    # ── Build ──────────────────────────────────────────────────────────
+
+    def _section(self, parent, title):
+        """Returns a labelled card frame."""
+        card = ctk.CTkFrame(parent, fg_color=self._CARD, corner_radius=10)
+        card.pack(fill="x", padx=18, pady=(0, 10))
+        ctk.CTkLabel(card, text=title,
+                     font=("Segoe UI", 11, "bold"),
+                     text_color=self._MUTED).pack(anchor="w", padx=12, pady=(8, 2))
+        return card
+
+    def _row(self, parent, label, right_widget_fn):
+        """Two-column row: label on left, widget on right."""
+        row = ctk.CTkFrame(parent, fg_color="transparent")
+        row.pack(fill="x", padx=12, pady=5)
+        row.grid_columnconfigure(0, weight=1)
+        row.grid_columnconfigure(1, weight=0)
+        ctk.CTkLabel(row, text=label, font=("Segoe UI", 12),
+                     text_color=self._TEXT, anchor="w").grid(row=0, column=0, sticky="w")
+        widget = right_widget_fn(row)
+        widget.grid(row=0, column=1, sticky="e", padx=(8, 0))
+        return widget
+
+    def _build_ui(self):
+        # ── Title ───────────────────────────────────────────────────
+        ctk.CTkLabel(self, text="Settings",
+                     font=("Segoe UI", 20, "bold"),
+                     text_color=self._ACCENT).pack(pady=(20, 4))
+        ctk.CTkLabel(self, text="Changes are applied immediately — no restart needed.",
+                     font=("Segoe UI", 10), text_color=self._MUTED).pack(pady=(0, 12))
+
+        # ── 1. CDP Port ─────────────────────────────────────────────
+        card1 = self._section(self, "BROWSER CONNECTION")
+        port_row = ctk.CTkFrame(card1, fg_color="transparent")
+        port_row.pack(fill="x", padx=12, pady=(4, 8))
+        port_row.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(port_row, text="Chrome Debug Port",
+                     font=("Segoe UI", 12), text_color=self._TEXT,
+                     anchor="w").grid(row=0, column=0, sticky="w")
+
+        self._port_var = ctk.StringVar()
+        port_entry = ctk.CTkEntry(port_row, textvariable=self._port_var,
+                                  width=90, height=32,
+                                  font=("Consolas", 12),
+                                  justify="center")
+        port_entry.grid(row=0, column=1, sticky="e")
+
+        ctk.CTkLabel(card1,
+                     text="Chrome must be launched with  --remote-debugging-port=<value>",
+                     font=("Segoe UI", 9), text_color=self._MUTED,
+                     wraplength=440, justify="left").pack(anchor="w", padx=12, pady=(0, 8))
+
+        # ── 2. Typing Speed ─────────────────────────────────────────
+        card2 = self._section(self, "TYPING BEHAVIOUR")
+
+        speed_row = ctk.CTkFrame(card2, fg_color="transparent")
+        speed_row.pack(fill="x", padx=12, pady=(4, 4))
+        speed_row.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(speed_row, text="Typing Speed",
+                     font=("Segoe UI", 12), text_color=self._TEXT,
+                     anchor="w").grid(row=0, column=0, sticky="w")
+
+        self._speed_var = ctk.StringVar(value="normal")
+        seg = ctk.CTkSegmentedButton(
+            speed_row,
+            values=["slow", "normal", "fast"],
+            variable=self._speed_var,
+            font=("Segoe UI", 11),
+            width=200,
+        )
+        seg.grid(row=0, column=1, sticky="e")
+
+        speed_hints = ctk.CTkFrame(card2, fg_color="transparent")
+        speed_hints.pack(fill="x", padx=12, pady=(0, 4))
+        for label, hint in [("slow", "100–220 ms/key"),
+                             ("normal", "40–140 ms/key"),
+                             ("fast", "20–70 ms/key")]:
+            ctk.CTkLabel(speed_hints, text=f"{label}: {hint}",
+                         font=("Segoe UI", 9), text_color=self._MUTED).pack(side="left", padx=8)
+
+        # Typo simulation toggle
+        self._typo_var = ctk.BooleanVar()
+        typo_row = ctk.CTkFrame(card2, fg_color="transparent")
+        typo_row.pack(fill="x", padx=12, pady=(2, 10))
+        ctk.CTkLabel(typo_row, text="Typo simulation (occasional mis-key + backspace)",
+                     font=("Segoe UI", 12), text_color=self._TEXT).pack(side="left")
+        ctk.CTkSwitch(typo_row, text="", variable=self._typo_var,
+                      width=46).pack(side="right")
+
+        # ── 3. 2FA Timeout ──────────────────────────────────────────
+        card3 = self._section(self, "2FA WAIT TIMEOUT")
+
+        self._twofa_var = ctk.IntVar(value=120)
+        twofa_hdr = ctk.CTkFrame(card3, fg_color="transparent")
+        twofa_hdr.pack(fill="x", padx=12, pady=(4, 0))
+        ctk.CTkLabel(twofa_hdr, text="Seconds to wait for manual 2FA",
+                     font=("Segoe UI", 12), text_color=self._TEXT).pack(side="left")
+        self._twofa_lbl = ctk.CTkLabel(twofa_hdr, text="120 s",
+                                        font=("Consolas", 12, "bold"),
+                                        text_color=self._ACCENT)
+        self._twofa_lbl.pack(side="right")
+
+        ctk.CTkSlider(card3, from_=30, to=300, number_of_steps=27,
+                      variable=self._twofa_var,
+                      command=lambda v: self._twofa_lbl.configure(text=f"{int(v)} s")
+                      ).pack(fill="x", padx=12, pady=(4, 4))
+
+        ctk.CTkLabel(card3,
+                     text="Applies to SMS, Email, and Google Prompt 2FA methods.",
+                     font=("Segoe UI", 9), text_color=self._MUTED).pack(
+            anchor="w", padx=12, pady=(0, 8))
+
+        # ── 4. Account Gap ──────────────────────────────────────────
+        card4 = self._section(self, "DELAY BETWEEN ACCOUNTS")
+
+        # Min gap
+        min_hdr = ctk.CTkFrame(card4, fg_color="transparent")
+        min_hdr.pack(fill="x", padx=12, pady=(4, 0))
+        ctk.CTkLabel(min_hdr, text="Minimum gap (seconds)",
+                     font=("Segoe UI", 12), text_color=self._TEXT).pack(side="left")
+        self._gap_min_lbl = ctk.CTkLabel(min_hdr, text="3 s",
+                                          font=("Consolas", 12, "bold"),
+                                          text_color=self._ACCENT)
+        self._gap_min_lbl.pack(side="right")
+        self._gap_min_var = ctk.DoubleVar(value=3.0)
+        ctk.CTkSlider(card4, from_=1, to=15, number_of_steps=14,
+                      variable=self._gap_min_var,
+                      command=lambda v: self._gap_min_lbl.configure(text=f"{int(v)} s")
+                      ).pack(fill="x", padx=12, pady=(2, 6))
+
+        # Max gap
+        max_hdr = ctk.CTkFrame(card4, fg_color="transparent")
+        max_hdr.pack(fill="x", padx=12, pady=(0, 0))
+        ctk.CTkLabel(max_hdr, text="Maximum gap (seconds)",
+                     font=("Segoe UI", 12), text_color=self._TEXT).pack(side="left")
+        self._gap_max_lbl = ctk.CTkLabel(max_hdr, text="7 s",
+                                          font=("Consolas", 12, "bold"),
+                                          text_color=self._ACCENT)
+        self._gap_max_lbl.pack(side="right")
+        self._gap_max_var = ctk.DoubleVar(value=7.0)
+        ctk.CTkSlider(card4, from_=1, to=30, number_of_steps=29,
+                      variable=self._gap_max_var,
+                      command=lambda v: self._gap_max_lbl.configure(text=f"{int(v)} s")
+                      ).pack(fill="x", padx=12, pady=(2, 10))
+
+        # ── Buttons ─────────────────────────────────────────────────
+        btn_row = ctk.CTkFrame(self, fg_color="transparent")
+        btn_row.pack(fill="x", padx=18, pady=(4, 20))
+
+        ctk.CTkButton(btn_row, text="Reset to Defaults",
+                      command=self._reset,
+                      height=36, font=("Segoe UI", 12),
+                      fg_color="#334155", hover_color="#475569",
+                      width=160).pack(side="left")
+
+        ctk.CTkButton(btn_row, text="Save Settings",
+                      command=self._save,
+                      height=36, font=("Segoe UI", 13, "bold"),
+                      fg_color=self._ACCENT, hover_color="#2563eb",
+                      width=160).pack(side="right")
+
+    # ── Populate / Save / Reset ────────────────────────────────────────
+
+    def _populate(self):
+        """Fill all widgets from the loaded settings dict."""
+        self._port_var.set(str(self._s.get("cdp_port", 9222)))
+        self._speed_var.set(self._s.get("typing_speed", "normal"))
+        self._typo_var.set(bool(self._s.get("typo_simulation", True)))
+
+        twofa = int(self._s.get("twofa_timeout", 120))
+        self._twofa_var.set(twofa)
+        self._twofa_lbl.configure(text=f"{twofa} s")
+
+        gap_min = float(self._s.get("account_gap_min", 3.0))
+        gap_max = float(self._s.get("account_gap_max", 7.0))
+        self._gap_min_var.set(gap_min)
+        self._gap_max_var.set(gap_max)
+        self._gap_min_lbl.configure(text=f"{int(gap_min)} s")
+        self._gap_max_lbl.configure(text=f"{int(gap_max)} s")
+
+    def _save(self):
+        # Validate port
+        try:
+            port = int(self._port_var.get())
+            if not (1 <= port <= 65535):
+                raise ValueError
+        except ValueError:
+            from tkinter import messagebox
+            messagebox.showerror("Invalid Port",
+                                 "CDP Port must be a number between 1 and 65535.",
+                                 parent=self)
+            return
+
+        # Validate gap ordering
+        g_min = int(self._gap_min_var.get())
+        g_max = int(self._gap_max_var.get())
+        if g_min > g_max:
+            g_max = g_min   # silently clamp
+
+        settings = {
+            "cdp_port":        port,
+            "typing_speed":    self._speed_var.get(),
+            "typo_simulation": self._typo_var.get(),
+            "twofa_timeout":   int(self._twofa_var.get()),
+            "account_gap_min": float(g_min),
+            "account_gap_max": float(g_max),
+        }
+        config.save(settings)
+        self.destroy()
+
+    def _reset(self):
+        self._s = config.reset()
+        self._populate()
 
 
 if __name__ == "__main__":
