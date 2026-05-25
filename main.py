@@ -693,13 +693,14 @@ class App(ctk.CTk):
         port = config.load().get("cdp_port", 9222)
 
         def _check():
-            connected = chrome_launcher.is_chrome_debug_running(port)
-            self.after(0, lambda: self._update_chrome_status(connected, port))
+            connected, detail = chrome_launcher.check_chrome_debug_detailed(port)
+            self.after(0, lambda: self._update_chrome_status(connected, port, detail))
 
         threading.Thread(target=_check, daemon=True).start()
         self.after(3000, self.poll_chrome_status)
 
-    def _update_chrome_status(self, connected: bool, port: int):
+    def _update_chrome_status(self, connected: bool, port: int, detail: str = ""):
+        prev = self._chrome_connected
         self._chrome_connected = connected
         if connected:
             self.chrome_dot.configure(text_color="#22c55e")
@@ -713,6 +714,8 @@ class App(ctk.CTk):
                 hover_color="#166534",
                 state="disabled"
             )
+            if not prev:
+                self.add_log(f"✔ Chrome CDP connected — {detail}")
         else:
             self.chrome_dot.configure(text_color="#ef4444")
             self.chrome_status_lbl.configure(
@@ -725,7 +728,11 @@ class App(ctk.CTk):
                 hover_color="#4338ca",
                 state="normal"
             )
-        # Re-evaluate Start button — needs both accounts selected AND Chrome connected
+            if prev:
+                self.add_log(f"✘ Chrome disconnected — {detail}")
+            elif detail and "not open" not in detail:
+                # Port was reachable but CDP failed — log it once for diagnosis
+                self.add_log(f"[CDP check] {detail}")
         self.update_login_button()
 
     def launch_chrome_browser(self):
@@ -751,9 +758,12 @@ class App(ctk.CTk):
                 ))
                 import time
                 # Poll every second for up to 15 seconds until CDP responds
-                for _ in range(15):
+                last_detail = ""
+                for i in range(15):
                     time.sleep(1)
-                    if chrome_launcher.is_chrome_debug_running(port):
+                    connected, last_detail = chrome_launcher.check_chrome_debug_detailed(port)
+                    self.after(0, lambda d=last_detail, i=i: self.add_log(f"  [{i+1}s] {d}"))
+                    if connected:
                         break
                 self.after(0, lambda: self.poll_chrome_status())
             else:

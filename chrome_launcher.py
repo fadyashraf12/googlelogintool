@@ -28,6 +28,36 @@ def is_chrome_debug_running(port: int = 9222) -> bool:
         return False
 
 
+def check_chrome_debug_detailed(port: int = 9222) -> tuple[bool, str]:
+    """
+    Like is_chrome_debug_running but returns (connected, detail_message)
+    so callers can log exactly what went wrong.
+    """
+    import socket
+
+    # 1. Is anything listening on the port at all?
+    try:
+        s = socket.create_connection(("127.0.0.1", port), timeout=1)
+        s.close()
+        port_open = True
+    except Exception as sock_err:
+        return False, f"Port {port} not open: {sock_err}"
+
+    # 2. Port is open — try the CDP HTTP endpoint
+    try:
+        url = f"http://127.0.0.1:{port}/json/version"
+        with urllib.request.urlopen(url, timeout=2) as resp:
+            raw = resp.read()
+        data = json.loads(raw)
+        if data.get("webSocketDebuggerUrl") or data.get("Browser"):
+            return True, f"Connected — {data.get('Browser', 'unknown browser')}"
+        return False, f"Port open but CDP response missing fields: {data}"
+    except json.JSONDecodeError as je:
+        return False, f"Port open but invalid JSON from CDP: {je}"
+    except Exception as he:
+        return False, f"Port {port} open but HTTP error: {he}"
+
+
 # ── Executable discovery ──────────────────────────────────────────────
 
 def _windows_chrome_path() -> str | None:
