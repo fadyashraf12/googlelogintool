@@ -5,7 +5,7 @@ stack = "BEST_EFFORT_FALLBACK"
 
 [nix]
 channel = "stable-25_05"
-packages = ["gitFull", "playwright-driver"]
+packages = ["freetype", "gitFull", "lcms2", "libimagequant", "libjpeg", "libtiff", "libwebp", "libxcrypt", "openjpeg", "playwright-driver", "scrot", "tcl", "tk", "xvfb-run", "zlib"]
 
 [workflows]
 runButton = "Project"
@@ -28,7 +28,7 @@ outputType = "vnc"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "Xvfb :99 -screen 0 1280x900x24 & sleep 1 && DISPLAY=:99 PLAYWRIGHT_BROWSERS_PATH=/nix/store/kcvsxrmgwp3ffz5jijyy7wn9fcsjl4hz-playwright-browsers-1.55.0-with-cjk python main.py"
+args = "touch ~/.Xauthority && Xvfb :99 -screen 0 1280x900x24 & sleep 1 && DISPLAY=:99 XAUTHORITY=$HOME/.Xauthority python main.py"
 
 [deployment]
 deploymentTarget = "vm"

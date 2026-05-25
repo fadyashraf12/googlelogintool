@@ -12,17 +12,28 @@ from tkinter import ttk, messagebox
 
 
 # ── Packages that must be importable ─────────────────────────────────
+import platform as _platform
+
 REQUIRED_PACKAGES = [
     ("customtkinter", "customtkinter"),
-    ("playwright",    "playwright"),
     ("pyotp",         "pyotp"),
+    ("pyautogui",     "pyautogui"),
+    ("pyperclip",     "pyperclip"),
+    ("PIL",           "Pillow"),
 ]
+
+# pygetwindow is Windows-only — add it only when running on Windows
+if _platform.system() == "Windows":
+    REQUIRED_PACKAGES.append(("pygetwindow", "pygetwindow"))
 
 # pip install names (may differ from import name)
 PIP_NAMES = {
     "customtkinter": "customtkinter",
-    "playwright":    "playwright",
     "pyotp":         "pyotp",
+    "pyautogui":     "pyautogui",
+    "pygetwindow":   "pygetwindow",
+    "pyperclip":     "pyperclip",
+    "PIL":           "Pillow",
 }
 
 
@@ -124,7 +135,7 @@ def _is_importable(module_name):
     try:
         importlib.import_module(module_name)
         return True
-    except ImportError:
+    except (ImportError, NotImplementedError, Exception):
         return False
 
 
@@ -141,39 +152,6 @@ def _pip_install(pip_name, win):
     return True
 
 
-def _playwright_browser_installed():
-    """Return True if Playwright's Chromium executable is already present."""
-    import os
-    replit_chromium = os.environ.get("REPLIT_PLAYWRIGHT_CHROMIUM_EXECUTABLE", "")
-    if replit_chromium and os.path.isfile(replit_chromium):
-        return True
-    try:
-        from playwright.sync_api import sync_playwright
-        with sync_playwright() as p:
-            exe = p.chromium.executable_path
-        return exe and os.path.isfile(exe)
-    except Exception:
-        return False
-
-
-def _install_playwright_browser(win):
-    import os
-    replit_chromium = os.environ.get("REPLIT_PLAYWRIGHT_CHROMIUM_EXECUTABLE", "")
-    if replit_chromium and os.path.isfile(replit_chromium):
-        win.append_log("  ✔ Playwright Chromium ready (Replit system browser).")
-        return True
-    win.append_log("  Installing Playwright Chromium browser (one-time download)…")
-    result = subprocess.run(
-        [sys.executable, "-m", "playwright", "install", "chromium"],
-        capture_output=True, text=True
-    )
-    if result.returncode != 0:
-        win.append_log(f"  ERROR: {result.stderr.strip()}")
-        return False
-    win.append_log("  ✔ Playwright Chromium ready.")
-    return True
-
-
 # ─────────────────────────────────────────────────────────────────────
 # Main public function
 # ─────────────────────────────────────────────────────────────────────
@@ -185,11 +163,10 @@ def run_setup():
     Returns False → something could not be fixed; app should not start.
     """
     win = SetupWindow()
-    steps = len(REQUIRED_PACKAGES) + 1           # packages + playwright browser
+    steps = len(REQUIRED_PACKAGES)
     completed = 0
     all_ok = True
 
-    # ── Step 1-N: Python packages ─────────────────────────────────
     for import_name, pip_name in REQUIRED_PACKAGES:
         win.set_status(f"Checking: {pip_name}…")
         win.append_log(f"Checking {pip_name}…")
@@ -205,25 +182,11 @@ def run_setup():
         completed += 1
         win.set_progress((completed / steps) * 100)
 
-    # ── Step N+1: Playwright browser ─────────────────────────────
-    win.set_status("Checking: Playwright Chromium browser…")
-    win.append_log("Checking Playwright Chromium browser…")
-
-    if _playwright_browser_installed():
-        win.append_log("  ✔ Playwright Chromium is ready.")
-    else:
-        win.append_log("  ✗ Chromium not found — downloading now…")
-        if not _install_playwright_browser(win):
-            all_ok = False
-            win.append_log("  ✘ Playwright browser install failed.")
-
-    completed += 1
     win.set_progress(100)
 
-    # ── Final result ──────────────────────────────────────────────
     if all_ok:
-        win.set_status("✔ All dependencies satisfied — launching app…")
-        win.append_log("\nAll checks passed. Starting the main application…")
+        win.set_status("✔ All dependencies ready — launching app…")
+        win.append_log("\nAll checks passed. Starting…")
         win.root.after(900, win.close)
         win.root.mainloop()
         return True
@@ -231,15 +194,15 @@ def run_setup():
         win.set_status("✘ Some dependencies could not be installed.")
         win.append_log(
             "\nOne or more packages could not be installed automatically.\n"
-            "Please run:  pip install customtkinter playwright pyotp\n"
+            "Please run:  pip install -r requirements.txt\n"
             "Then re-launch the app."
         )
         messagebox.showerror(
             "Setup Failed",
-            "Some required packages could not be installed automatically.\n\n"
-            "Please run this command in a terminal, then restart the app:\n\n"
-            "    pip install customtkinter playwright pyotp\n"
-            "    python -m playwright install chromium",
+            "Some packages could not be installed automatically.\n\n"
+            "Open a terminal in the app folder and run:\n\n"
+            "    pip install -r requirements.txt\n\n"
+            "Then restart the app.",
             parent=win.root,
         )
         win.close()

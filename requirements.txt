@@ -1,0 +1,6 @@
+customtkinter
+pyotp
+pyautogui
+pygetwindow
+pyperclip
+Pillow
