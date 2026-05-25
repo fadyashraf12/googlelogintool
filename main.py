@@ -787,15 +787,17 @@ class App(ctk.CTk):
             ok, msg = chrome_launcher.launch_chrome(port)
             if msg == "already_running":
                 self.after(0, lambda: self.add_log(
-                    f"Chrome is already running with debug port {port}."
+                    f"✔ Chrome is already running with debug port {port}."
                 ))
-            elif ok:
+            elif ok and msg.startswith("launched:"):
+                kind = msg.split("launched:", 1)[1]
                 self.after(0, lambda: self.add_log(
-                    "Chrome launched successfully with "
-                    f"--remote-debugging-port={port}.\n"
-                    "Waiting for it to start…"
+                    f"✔ Launched {kind}\n"
+                    f"   with --remote-debugging-port={port}\n"
+                    "   Waiting for it to start…\n"
+                    "   NOTE: If Chrome was already open, close ALL Chrome\n"
+                    "   windows first and click Launch again."
                 ))
-                # Give the browser a moment then refresh status
                 import time
                 time.sleep(3)
                 self.after(0, lambda: self.poll_chrome_status())
