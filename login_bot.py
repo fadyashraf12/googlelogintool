@@ -609,37 +609,51 @@ def login_single_account(page, email, password, twofa_enabled,
 
 def login_accounts(accounts, log_callback=None, stop_event=None):
     """
-    Connect to the user's running Chrome via CDP and sequentially log in
-    each of the provided accounts in a new tab.
+    Launch a browser window directly and sequentially log in each account.
+    No external Chrome connection required.
     """
+    import os
+    import sys as _sys
     log = log_callback or (lambda _: None)
 
     with sync_playwright() as p:
-        # ── Connect to existing Chrome instance ───────────────────────
+        # ── Build launch args ─────────────────────────────────────────
+        launch_args = [
+            "--no-first-run",
+            "--no-default-browser-check",
+            "--disable-blink-features=AutomationControlled",
+        ]
+        if _sys.platform.startswith("linux"):
+            launch_args += [
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--user-data-dir=/tmp/chrome-debug-profile",
+            ]
+
+        # Use the Replit-provided Chromium if available, otherwise let
+        # Playwright pick its own bundled browser.
+        chromium_exe = os.environ.get("REPLIT_PLAYWRIGHT_CHROMIUM_EXECUTABLE", "")
+        exe_path = chromium_exe if chromium_exe and os.path.isfile(chromium_exe) else None
+
+        # ── Launch browser ────────────────────────────────────────────
         try:
-            cdp_endpoint = config.get_cdp_endpoint()
-            browser = p.chromium.connect_over_cdp(cdp_endpoint)
-            context = browser.contexts[0]
-            log("✔ Connected to your running Chrome browser.")
+            browser = p.chromium.launch(
+                headless=False,
+                executable_path=exe_path,
+                args=launch_args,
+            )
         except Exception:
-            cdp_port = config.load().get("cdp_port", 9222)
-            log("✘ CRITICAL: Could not connect to Chrome.")
-            log(f"  Chrome must be running with:  --remote-debugging-port={cdp_port}")
-            log("")
-            log("  How to set this up:")
-            log("  • Windows: Right-click the Chrome shortcut → Properties")
-            log("    → append  --remote-debugging-port=9222  to the Target field.")
-            log("  • Mac/Linux: launch Chrome from terminal:")
-            log('    google-chrome --remote-debugging-port=9222')
-            log("")
-            log("  Then close all existing Chrome windows and relaunch with that flag.")
-            log("─" * 50)
+            log("✘ CRITICAL: Could not launch the browser.")
             log(traceback.format_exc())
             return
 
+        context = browser.new_context()
+        log("✔ Browser launched successfully.")
+
         # ── Open a single automation tab (reused across accounts) ─────
         page = context.new_page()
-        log("✔ Opened a new automation tab in your browser.")
+        log("✔ Opened automation tab.")
 
         # ── Process each account sequentially ─────────────────────────
         total = len(accounts)
@@ -697,6 +711,10 @@ def login_accounts(accounts, log_callback=None, stop_event=None):
         log("✔ All selected accounts processed.")
         try:
             page.close()
-            log("✔ Automation tab closed.")
+        except Exception:
+            pass
+        try:
+            browser.close()
+            log("✔ Browser closed.")
         except Exception as e:
-            log(f"  Note: Could not close the tab automatically ({e})")
+            log(f"  Note: Could not close browser ({e})")

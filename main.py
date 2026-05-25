@@ -11,7 +11,6 @@ import customtkinter as ctk
 import datetime
 import subprocess
 import config
-import chrome_launcher
 
 from database import (
     init_db,
@@ -43,7 +42,6 @@ class App(ctk.CTk):
         self.account_vars = []
         self.selected_edit_id = None
         self.stop_event = threading.Event()
-        self._chrome_connected = False
 
         self.build_ui()
 
@@ -168,41 +166,34 @@ class App(ctk.CTk):
         tab_auto = tabview.tab("⚡  Automation")
         tab_auto.grid_columnconfigure(0, weight=1)
 
-        # STEP 1 — Chrome connection
+        # STEP 1 — Ready indicator (browser is launched automatically)
         step1_card = ctk.CTkFrame(tab_auto, fg_color="#151821", corner_radius=10)
         step1_card.pack(fill="x", padx=5, pady=(8, 6))
 
         step1_hdr = ctk.CTkFrame(step1_card, fg_color="transparent")
         step1_hdr.pack(fill="x", padx=12, pady=(10, 4))
 
-        ctk.CTkLabel(step1_hdr, text="STEP 1 — Connect Chrome",
+        ctk.CTkLabel(step1_hdr, text="STEP 1 — Browser",
                      font=("Segoe UI", 13, "bold"), text_color="#6366f1"
                      ).pack(side="left")
 
         status_row = ctk.CTkFrame(step1_card, fg_color="#0f172a", corner_radius=6)
         status_row.pack(fill="x", padx=12, pady=(0, 8))
 
-        self.chrome_dot = ctk.CTkLabel(
+        ctk.CTkLabel(
             status_row, text="●", font=("Segoe UI", 20),
-            text_color="#64748b", width=28)
-        self.chrome_dot.pack(side="left", padx=(10, 4), pady=8)
+            text_color="#22c55e", width=28
+        ).pack(side="left", padx=(10, 4), pady=8)
 
-        self.chrome_status_lbl = ctk.CTkLabel(
-            status_row, text="Chrome: checking…",
-            font=("Segoe UI", 12, "bold"), text_color="#94a3b8", anchor="w")
-        self.chrome_status_lbl.pack(side="left", pady=8)
+        ctk.CTkLabel(
+            status_row, text="Browser launches automatically when you start",
+            font=("Segoe UI", 12, "bold"), text_color="#22c55e", anchor="w"
+        ).pack(side="left", pady=8)
 
         ctk.CTkLabel(step1_card,
-                     text="Close ALL Chrome windows first, then click below:",
+                     text="No setup needed — the bot opens its own browser window.",
                      font=("Segoe UI", 10), text_color="#64748b"
-                     ).pack(anchor="w", padx=12)
-
-        self.chrome_btn = ctk.CTkButton(
-            step1_card, text="Launch Chrome with Debug Port",
-            command=self.launch_chrome_browser,
-            height=40, font=("Segoe UI", 13, "bold"),
-            fg_color="#4f46e5", hover_color="#4338ca")
-        self.chrome_btn.pack(fill="x", padx=12, pady=(6, 12))
+                     ).pack(anchor="w", padx=12, pady=(0, 12))
 
         # STEP 2 — Run automation
         step2_card = ctk.CTkFrame(tab_auto, fg_color="#151821", corner_radius=10)
@@ -255,9 +246,8 @@ class App(ctk.CTk):
             border_width=1, border_color="#475569")
         self.settings_btn.pack(fill="x", padx=12, pady=(0, 12))
 
-        # Init field states + start poller
+        # Init field states
         self.update_phone_fields()
-        self.after(500, self.poll_chrome_status)
 
         # ==========================
         # RIGHT PANEL: GRID & LOGS
@@ -636,28 +626,12 @@ class App(ctk.CTk):
             self.add_log("Error: Select at least one account to log in.")
             return
 
-        # Hard block if Chrome isn't connected — show a visible popup, not just a log line
-        if not self._chrome_connected:
-            from tkinter import messagebox
-            port = config.load().get("cdp_port", 9222)
-            messagebox.showerror(
-                "Chrome Not Connected",
-                f"Chrome is not running with the debug port open (port {port}).\n\n"
-                "Click the  'Launch Chrome'  button and wait for the status\n"
-                "indicator to turn green, then try again.",
-                parent=self
-            )
-            return
-
         self.add_log(f"Launching batch login flow for {len(selected_accounts)} accounts...")
         self.stop_event.clear()
 
-        # Update button states
         self.start_btn.configure(state="disabled")
         self.stop_btn.configure(state="normal")
-        self.chrome_btn.configure(state="disabled")
 
-        # Start thread
         def run_thread():
             try:
                 login_accounts(selected_accounts, self.add_log, self.stop_event)
@@ -677,99 +651,11 @@ class App(ctk.CTk):
     def on_login_finished(self):
         self.start_btn.configure(state="normal")
         self.stop_btn.configure(state="disabled")
-        self.chrome_btn.configure(state="normal")
         self.load_accounts()
         self.add_log("Automation batch flow ended.")
 
     def open_settings(self):
         SettingsDialog(self)
-
-    # ==========================
-    # CHROME AUTO-LAUNCH
-    # ==========================
-
-    def poll_chrome_status(self):
-        """Check CDP port every 3 s in a background thread so the UI never freezes."""
-        port = config.load().get("cdp_port", 9222)
-
-        def _check():
-            connected, detail = chrome_launcher.check_chrome_debug_detailed(port)
-            self.after(0, lambda: self._update_chrome_status(connected, port, detail))
-
-        threading.Thread(target=_check, daemon=True).start()
-        self.after(3000, self.poll_chrome_status)
-
-    def _update_chrome_status(self, connected: bool, port: int, detail: str = ""):
-        prev = self._chrome_connected
-        self._chrome_connected = connected
-        if connected:
-            self.chrome_dot.configure(text_color="#22c55e")
-            self.chrome_status_lbl.configure(
-                text=f"Chrome: connected  (port {port})",
-                text_color="#22c55e"
-            )
-            self.chrome_btn.configure(
-                text="Chrome Connected ✔",
-                fg_color="#14532d",
-                hover_color="#166534",
-                state="disabled"
-            )
-            if not prev:
-                self.add_log(f"✔ Chrome CDP connected — {detail}")
-        else:
-            self.chrome_dot.configure(text_color="#ef4444")
-            self.chrome_status_lbl.configure(
-                text=f"Chrome: not running  (port {port})",
-                text_color="#f87171"
-            )
-            self.chrome_btn.configure(
-                text="Launch Chrome",
-                fg_color="#4f46e5",
-                hover_color="#4338ca",
-                state="normal"
-            )
-            if prev:
-                self.add_log(f"✘ Chrome disconnected — {detail}")
-            elif detail and "not open" not in detail:
-                # Port was reachable but CDP failed — log it once for diagnosis
-                self.add_log(f"[CDP check] {detail}")
-        self.update_login_button()
-
-    def launch_chrome_browser(self):
-        """Detect Chrome, launch it if missing, and report in the log."""
-        port = config.load().get("cdp_port", 9222)
-        self.add_log(f"Checking Chrome on port {port}…")
-
-        # Run in a thread so the UI stays responsive
-        def _do_launch():
-            ok, msg = chrome_launcher.launch_chrome(port)
-            if msg == "already_running":
-                self.after(0, lambda: self.add_log(
-                    f"✔ Chrome is already running with debug port {port}."
-                ))
-            elif ok and msg.startswith("launched:"):
-                kind = msg.split("launched:", 1)[1]
-                self.after(0, lambda: self.add_log(
-                    f"✔ Launched {kind}\n"
-                    f"   with --remote-debugging-port={port}\n"
-                    "   Waiting for it to start…\n"
-                    "   NOTE: If Chrome was already open, close ALL Chrome\n"
-                    "   windows first and click Launch again."
-                ))
-                import time
-                # Poll every second for up to 15 seconds until CDP responds
-                last_detail = ""
-                for i in range(15):
-                    time.sleep(1)
-                    connected, last_detail = chrome_launcher.check_chrome_debug_detailed(port)
-                    self.after(0, lambda d=last_detail, i=i: self.add_log(f"  [{i+1}s] {d}"))
-                    if connected:
-                        break
-                self.after(0, lambda: self.poll_chrome_status())
-            else:
-                self.after(0, lambda: self.add_log(f"✘ {msg}"))
-
-        threading.Thread(target=_do_launch, daemon=True).start()
 
 
 # ──────────────────────────────────────────────────────────────────────────────
