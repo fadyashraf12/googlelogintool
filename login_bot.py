@@ -94,7 +94,7 @@ def start_chrome(log_callback=None):
                 log_callback("Hanging background Chrome instances detected. Clearing and restarting...")
             
             # Terminate background tasks
-            os.system("taskkill /f /im chrome.exe >nul 2>&1")
+                    # os.system("taskkill /f /im chrome.exe >nul 2>os.system("taskkill /f /im chrome.exe >nul 2>&1")1")
             time.sleep(2)
 
             # Relaunch
