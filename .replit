@@ -23,12 +23,12 @@ args = "Start application"
 name = "Start application"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "Xvfb :99 -screen 0 1280x900x24 & sleep 1 && DISPLAY=:99 python main.py"
-
 [workflows.workflow.metadata]
 outputType = "vnc"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "Xvfb :99 -screen 0 1280x900x24 & sleep 1 && DISPLAY=:99 PLAYWRIGHT_BROWSERS_PATH=/nix/store/kcvsxrmgwp3ffz5jijyy7wn9fcsjl4hz-playwright-browsers-1.55.0-with-cjk python main.py"
 
 [deployment]
 deploymentTarget = "vm"

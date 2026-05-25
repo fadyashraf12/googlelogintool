@@ -143,17 +143,25 @@ def _pip_install(pip_name, win):
 
 def _playwright_browser_installed():
     """Return True if Playwright's Chromium executable is already present."""
+    import os
+    replit_chromium = os.environ.get("REPLIT_PLAYWRIGHT_CHROMIUM_EXECUTABLE", "")
+    if replit_chromium and os.path.isfile(replit_chromium):
+        return True
     try:
         from playwright.sync_api import sync_playwright
         with sync_playwright() as p:
             exe = p.chromium.executable_path
-        import os
         return exe and os.path.isfile(exe)
     except Exception:
         return False
 
 
 def _install_playwright_browser(win):
+    import os
+    replit_chromium = os.environ.get("REPLIT_PLAYWRIGHT_CHROMIUM_EXECUTABLE", "")
+    if replit_chromium and os.path.isfile(replit_chromium):
+        win.append_log("  ✔ Playwright Chromium ready (Replit system browser).")
+        return True
     win.append_log("  Installing Playwright Chromium browser (one-time download)…")
     result = subprocess.run(
         [sys.executable, "-m", "playwright", "install", "chromium"],
