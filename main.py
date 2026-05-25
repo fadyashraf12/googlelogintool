@@ -626,7 +626,7 @@ class App(ctk.CTk):
 
     def update_login_button(self):
         selected = any(var.get() for var, acc in self.account_vars)
-        ready = selected and self._chrome_connected and not self.stop_event.is_set()
+        ready = selected and not self.stop_event.is_set()
         self.start_btn.configure(state="normal" if ready else "disabled")
 
     def start_login_process(self):

@@ -87,6 +87,29 @@ _MAC_CANDIDATES = [
 
 def _playwright_chromium_path() -> str | None:
     """Return the path to Playwright's bundled Chromium (test browser — last resort)."""
+    # Check Replit-provided Chromium first (fast, no subprocess needed)
+    replit_chromium = os.environ.get("REPLIT_PLAYWRIGHT_CHROMIUM_EXECUTABLE", "")
+    if replit_chromium and os.path.isfile(replit_chromium):
+        return replit_chromium
+
+    # Try reading from playwright's own driver config without starting a full context
+    try:
+        import playwright._impl._driver as _driver
+        driver_path = _driver.compute_driver_executable()
+        import subprocess as _sp
+        result = _sp.run(
+            [str(driver_path), "show-browsers"],
+            capture_output=True, text=True, timeout=5
+        )
+        for line in result.stdout.splitlines():
+            if "chromium" in line.lower() and os.sep in line:
+                candidate = line.strip().split()[-1]
+                if os.path.isfile(candidate):
+                    return candidate
+    except Exception:
+        pass
+
+    # Last resort: use the sync API (may be slow)
     try:
         from playwright.sync_api import sync_playwright
         with sync_playwright() as p:
@@ -103,12 +126,18 @@ def find_chrome_executable() -> tuple[str | None, bool]:
     Return (path, is_real_chrome).
 
     Priority:
-      1. User's real installed Chrome/Chromium  → is_real_chrome = True
-      2. Playwright's bundled Chromium (fallback) → is_real_chrome = False
+      1. Replit system Chromium (REPLIT_PLAYWRIGHT_CHROMIUM_EXECUTABLE env var)
+      2. User's real installed Chrome/Chromium  → is_real_chrome = True
+      3. Playwright's bundled Chromium (fallback) → is_real_chrome = False
 
     Using the real Chrome means the user's actual profile, bookmarks,
     cookies, and sessions are available inside the browser.
     """
+    # Priority 1: Replit-provided Chromium
+    replit_chromium = os.environ.get("REPLIT_PLAYWRIGHT_CHROMIUM_EXECUTABLE", "")
+    if replit_chromium and os.path.isfile(replit_chromium):
+        return replit_chromium, True
+
     if sys.platform.startswith("win"):
         path = _windows_chrome_path()
         if path:
