@@ -43,6 +43,7 @@ class App(ctk.CTk):
         self.account_vars = []
         self.selected_edit_id = None
         self.stop_event = threading.Event()
+        self._chrome_connected = False
 
         self.build_ui()
 
@@ -645,16 +646,27 @@ class App(ctk.CTk):
 
     def update_login_button(self):
         selected = any(var.get() for var, acc in self.account_vars)
-        if selected and not self.stop_event.is_set():
-            self.start_btn.configure(state="normal")
-        else:
-            self.start_btn.configure(state="disabled")
+        ready = selected and self._chrome_connected and not self.stop_event.is_set()
+        self.start_btn.configure(state="normal" if ready else "disabled")
 
     def start_login_process(self):
         selected_accounts = [acc for var, acc in self.account_vars if var.get()]
 
         if not selected_accounts:
             self.add_log("Error: Select at least one account to log in.")
+            return
+
+        # Hard block if Chrome isn't connected — show a visible popup, not just a log line
+        if not self._chrome_connected:
+            from tkinter import messagebox
+            port = config.load().get("cdp_port", 9222)
+            messagebox.showerror(
+                "Chrome Not Connected",
+                f"Chrome is not running with the debug port open (port {port}).\n\n"
+                "Click the  'Launch Chrome'  button and wait for the status\n"
+                "indicator to turn green, then try again.",
+                parent=self
+            )
             return
 
         self.add_log(f"Launching batch login flow for {len(selected_accounts)} accounts...")
@@ -708,8 +720,9 @@ class App(ctk.CTk):
         self.after(3000, self.poll_chrome_status)
 
     def _update_chrome_status(self, connected: bool, port: int):
+        self._chrome_connected = connected
         if connected:
-            self.chrome_dot.configure(text_color="#22c55e")          # green
+            self.chrome_dot.configure(text_color="#22c55e")
             self.chrome_status_lbl.configure(
                 text=f"Chrome: connected  (port {port})",
                 text_color="#22c55e"
@@ -721,7 +734,7 @@ class App(ctk.CTk):
                 state="disabled"
             )
         else:
-            self.chrome_dot.configure(text_color="#ef4444")          # red
+            self.chrome_dot.configure(text_color="#ef4444")
             self.chrome_status_lbl.configure(
                 text=f"Chrome: not running  (port {port})",
                 text_color="#f87171"
@@ -732,6 +745,8 @@ class App(ctk.CTk):
                 hover_color="#4338ca",
                 state="normal"
             )
+        # Re-evaluate Start button — needs both accounts selected AND Chrome connected
+        self.update_login_button()
 
     def launch_chrome_browser(self):
         """Detect Chrome, launch it if missing, and report in the log."""
