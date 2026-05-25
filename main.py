@@ -202,76 +202,105 @@ class App(ctk.CTk):
         # --- SECTION: AUTOMATION ENGINE CONTROLS ---
         engine_frame = ctk.CTkFrame(left_panel, fg_color="#151821")
         engine_frame.pack(fill="both", expand=True, padx=15, pady=(10, 15))
-        
-        ctk.CTkLabel(engine_frame, text="AUTOMATION CONTROLS", font=("Segoe UI", 12, "bold"), text_color="#64748b").pack(anchor="w", padx=10, pady=(5, 5))
 
-        self.start_btn = ctk.CTkButton(
-            engine_frame, 
-            text="Start Automated Login", 
-            command=self.start_login_process,
-            height=42,
-            font=("Segoe UI", 14, "bold"),
-            fg_color="#16a34a",
-            hover_color="#15803d",
-            text_color_disabled="#bbf7d0",
-            state="disabled"
-        )
-        self.start_btn.pack(fill="x", padx=10, pady=5)
+        ctk.CTkLabel(
+            engine_frame, text="AUTOMATION CONTROLS",
+            font=("Segoe UI", 12, "bold"), text_color="#64748b"
+        ).pack(anchor="w", padx=10, pady=(8, 4))
 
-        self.stop_btn = ctk.CTkButton(
-            engine_frame, 
-            text="Stop Automation", 
-            command=self.stop_login_process,
-            height=42,
-            font=("Segoe UI", 14, "bold"),
-            fg_color="#dc2626",
-            hover_color="#b91c1c",
-            text_color_disabled="#fecaca",
-            state="disabled"
-        )
-        self.stop_btn.pack(fill="x", padx=10, pady=5)
+        # ── STEP 1: Connect Chrome ────────────────────────────────────
+        step1_card = ctk.CTkFrame(engine_frame, fg_color="#0f172a", corner_radius=8)
+        step1_card.pack(fill="x", padx=10, pady=(0, 6))
 
-        # Chrome status row (dot + label)
-        chrome_status_row = ctk.CTkFrame(engine_frame, fg_color="transparent")
-        chrome_status_row.pack(fill="x", padx=10, pady=(8, 2))
+        step1_hdr = ctk.CTkFrame(step1_card, fg_color="transparent")
+        step1_hdr.pack(fill="x", padx=10, pady=(6, 2))
 
+        ctk.CTkLabel(
+            step1_hdr, text="STEP 1",
+            font=("Segoe UI", 9, "bold"), text_color="#4f46e5", width=46
+        ).pack(side="left")
+
+        # Status dot + text side by side
         self.chrome_dot = ctk.CTkLabel(
-            chrome_status_row, text="●",
-            font=("Segoe UI", 14),
-            text_color="#64748b", width=18
+            step1_hdr, text="●",
+            font=("Segoe UI", 16), text_color="#64748b", width=20
         )
-        self.chrome_dot.pack(side="left")
+        self.chrome_dot.pack(side="left", padx=(4, 2))
 
         self.chrome_status_lbl = ctk.CTkLabel(
-            chrome_status_row, text="Chrome: checking…",
-            font=("Segoe UI", 11), text_color="#94a3b8", anchor="w"
+            step1_hdr, text="Chrome: checking…",
+            font=("Segoe UI", 11, "bold"), text_color="#94a3b8", anchor="w"
         )
-        self.chrome_status_lbl.pack(side="left", padx=4)
+        self.chrome_status_lbl.pack(side="left")
 
-        # Launch / Connect button
         self.chrome_btn = ctk.CTkButton(
-            engine_frame,
-            text="Launch Chrome",
+            step1_card,
+            text="Launch Chrome with Debug Port",
             command=self.launch_chrome_browser,
-            height=38,
-            font=("Segoe UI", 13, "bold"),
+            height=36,
+            font=("Segoe UI", 12, "bold"),
             fg_color="#4f46e5",
             hover_color="#4338ca",
         )
-        self.chrome_btn.pack(fill="x", padx=10, pady=(2, 5))
+        self.chrome_btn.pack(fill="x", padx=10, pady=(4, 8))
 
+        # ── STEP 2: Select accounts above, then start ─────────────────
+        step2_card = ctk.CTkFrame(engine_frame, fg_color="#0f172a", corner_radius=8)
+        step2_card.pack(fill="x", padx=10, pady=(0, 6))
+
+        step2_hdr = ctk.CTkFrame(step2_card, fg_color="transparent")
+        step2_hdr.pack(fill="x", padx=10, pady=(6, 2))
+
+        ctk.CTkLabel(
+            step2_hdr, text="STEP 2",
+            font=("Segoe UI", 9, "bold"), text_color="#16a34a"
+        ).pack(side="left")
+
+        ctk.CTkLabel(
+            step2_hdr,
+            text="  Check accounts (right panel) → Start",
+            font=("Segoe UI", 10), text_color="#64748b"
+        ).pack(side="left")
+
+        self.start_btn = ctk.CTkButton(
+            step2_card,
+            text="Start Automated Login",
+            command=self.start_login_process,
+            height=40,
+            font=("Segoe UI", 13, "bold"),
+            fg_color="#16a34a",
+            hover_color="#15803d",
+            text_color_disabled="#4b7a57",
+            state="disabled"
+        )
+        self.start_btn.pack(fill="x", padx=10, pady=(4, 4))
+
+        self.stop_btn = ctk.CTkButton(
+            step2_card,
+            text="Stop Automation",
+            command=self.stop_login_process,
+            height=34,
+            font=("Segoe UI", 12, "bold"),
+            fg_color="#7f1d1d",
+            hover_color="#991b1b",
+            text_color_disabled="#fecaca",
+            state="disabled"
+        )
+        self.stop_btn.pack(fill="x", padx=10, pady=(0, 8))
+
+        # ── Settings ──────────────────────────────────────────────────
         self.settings_btn = ctk.CTkButton(
             engine_frame,
             text="⚙  Settings",
             command=self.open_settings,
-            height=35,
-            font=("Segoe UI", 12),
+            height=32,
+            font=("Segoe UI", 11),
             fg_color="#1e293b",
             hover_color="#334155",
             border_width=1,
             border_color="#334155",
         )
-        self.settings_btn.pack(fill="x", padx=10, pady=(2, 8))
+        self.settings_btn.pack(fill="x", padx=10, pady=(0, 8))
 
         # Set initial input field states
         self.update_phone_fields()
