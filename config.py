@@ -63,7 +63,7 @@ def reset() -> dict:
 # ── Convenience getters (used by login_bot.py) ───────────────────────
 
 def get_cdp_endpoint() -> str:
-    return f"http://localhost:{load()['cdp_port']}"
+    return f"http://127.0.0.1:{load()['cdp_port']}"
 
 
 def get_typing_delays() -> tuple[float, float]:

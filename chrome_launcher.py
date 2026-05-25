@@ -23,7 +23,7 @@ def is_chrome_debug_running(port: int = 9222) -> bool:
     Uses only stdlib — safe to call from anywhere.
     """
     try:
-        url = f"http://localhost:{port}/json/version"
+        url = f"http://127.0.0.1:{port}/json/version"
         with urllib.request.urlopen(url, timeout=2) as resp:
             data = json.loads(resp.read())
             return bool(data.get("webSocketDebuggerUrl") or data.get("Browser"))
