@@ -36,32 +36,55 @@ def _xclip_write(text):
         input=text, text=True, env=_env()
     )
 
+_BROWSER_KEYWORDS = [
+    "chrome", "chromium", "firefox", "brave", "opera",
+    "vivaldi", "edge", "navigator", "epiphany", "midori",
+    "google", "mozilla",
+]
+
 def find_browser_window():
     """
     Return the XID of any visible browser window the user has open.
-    Searches by window class (most reliable), then by title keywords.
-    Supports Chrome, Firefox, Brave, Edge, Opera, Vivaldi, Chromium, etc.
+    Uses wmctrl to list all windows, then matches by title or class name.
     """
-    # Search by WM_CLASS — works for all major browsers
+    env = _env()
+
+    # ── Method 1: wmctrl -lx lists "id desktop class hostname title" ─────────
+    try:
+        r = subprocess.run(
+            ["wmctrl", "-lx"], capture_output=True, text=True, env=env
+        )
+        if r.returncode == 0:
+            for line in r.stdout.splitlines():
+                parts = line.split(None, 4)
+                if len(parts) < 5:
+                    continue
+                wm_class = parts[2].lower()   # e.g. "google-chrome.Google-chrome"
+                title    = parts[4].lower()
+                if any(kw in wm_class or kw in title for kw in _BROWSER_KEYWORDS):
+                    # Convert hex window id to decimal for xdotool
+                    try:
+                        return str(int(parts[0], 16))
+                    except ValueError:
+                        return parts[0]
+    except FileNotFoundError:
+        pass   # wmctrl not installed — fall through
+
+    # ── Method 2: xdotool search by class (fallback) ──────────────────────────
     class_patterns = [
-        "Google-chrome", "google-chrome",
-        "Chromium", "chromium",
-        "Firefox", "firefox", "Navigator",
-        "Brave-browser", "brave-browser",
-        "Microsoft-edge", "microsoft-edge",
-        "Opera", "opera",
-        "Vivaldi", "vivaldi",
-        "Epiphany",  # GNOME Web
+        "Google-chrome", "Chromium", "chromium",
+        "Firefox", "Navigator",
+        "Brave-browser", "Microsoft-edge",
+        "Opera", "Vivaldi", "Epiphany",
     ]
     for cls in class_patterns:
         r = _xdo("search", "--onlyvisible", "--class", cls)
         if r.returncode == 0 and r.stdout.strip():
             return r.stdout.strip().split("\n")[-1].strip()
 
-    # Fallback: search by window name/title
-    for pattern in ["Google Chrome", "Chromium", "Mozilla Firefox",
-                    "Brave", "Microsoft Edge", "Opera"]:
-        r = _xdo("search", "--onlyvisible", "--name", pattern)
+    # ── Method 3: xdotool search by name (last resort) ────────────────────────
+    for pattern in ["Chrome", "Chromium", "Firefox", "Brave", "Edge", "Opera"]:
+        r = _xdo("search", "--name", pattern)
         if r.returncode == 0 and r.stdout.strip():
             return r.stdout.strip().split("\n")[-1].strip()
 

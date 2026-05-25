@@ -1,5 +1,6 @@
 {pkgs}: {
   deps = [
+    pkgs.wmctrl
     pkgs.xclip
     pkgs.xdotool
     pkgs.python312Packages.tkinter

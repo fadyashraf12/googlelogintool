@@ -711,18 +711,13 @@ class App(ctk.CTk):
         self.update_login_button()
 
     def launch_chrome_browser(self):
-        """Launch Chromium with a persistent user-data-dir so sessions are saved."""
-        self.add_log("Launching browser with persistent profile...")
-        self.chrome_btn.configure(state="disabled", text="Launching…")
+        """Open the system default browser (xdg-open), falling back to known binaries."""
+        self.add_log("Opening browser...")
+        self.chrome_btn.configure(state="disabled", text="Opening…")
 
         def _do():
-            import time
-            exe, _ = chrome_launcher.find_chrome_executable()
-            if not exe:
-                self.after(0, lambda: self.add_log(
-                    "✘ Could not find Chrome/Chromium on this system."))
-                self.after(0, lambda: self.chrome_btn.configure(state="normal"))
-                return
+            import time, shutil
+            from login_bot import find_browser_window
 
             env = os.environ.copy()
             env.setdefault("DISPLAY", ":99")
@@ -730,41 +725,79 @@ class App(ctk.CTk):
                 os.path.dirname(os.path.abspath(__file__)), "chrome-profile")
 
             try:
-                subprocess.Popen(
-                    [exe,
-                     "--no-sandbox",
-                     "--disable-dev-shm-usage",
-                     "--disable-gpu",
-                     "--no-first-run",
-                     "--no-default-browser-check",
-                     f"--user-data-dir={profile_dir}"],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    env=env,
-                    start_new_session=True,
-                )
-                self.after(0, lambda: self.add_log(
-                    f"✔ Browser launched with persistent profile.\n"
-                    f"   Profile saved at: {profile_dir}"))
-            except Exception as exc:
-                self.after(0, lambda: self.add_log(f"✘ Launch failed: {exc}"))
-                self.after(0, lambda: self.chrome_btn.configure(state="normal"))
-                return
+                launched = False
 
-            # Poll until window appears (up to 15 s)
-            from login_bot import find_browser_window
-            for _ in range(15):
-                time.sleep(1)
-                wid = find_browser_window()
-                if wid:
-                    self.after(0, lambda: self._update_browser_status(True))
-                    break
-            else:
-                self.after(0, lambda: self.add_log(
-                    "⚠ Browser launched but window not yet detected. "
-                    "It will be found on the next status check."))
+                # 1. Try xdg-open (respects the Linux default browser setting)
+                if shutil.which("xdg-open"):
+                    try:
+                        subprocess.Popen(
+                            ["xdg-open", "https://google.com"],
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                            env=env, start_new_session=True)
+                        self.after(0, lambda: self.add_log(
+                            "✔ Opened default browser via system handler."))
+                        launched = True
+                    except Exception:
+                        pass
 
-            self.after(0, lambda: self.chrome_btn.configure(state="normal"))
+                # 2. Fallback: try known browsers in order
+                if not launched:
+                    candidates = [
+                        "google-chrome", "google-chrome-stable",
+                        "chromium-browser", "chromium",
+                        "firefox", "brave-browser",
+                        "microsoft-edge",
+                    ]
+                    exe = next(
+                        (shutil.which(c) for c in candidates if shutil.which(c)),
+                        None
+                    )
+                    if not exe:
+                        # Last resort: Playwright's bundled Chromium
+                        exe, _ = chrome_launcher.find_chrome_executable()
+
+                    if exe:
+                        args = [exe]
+                        if "chrom" in exe.lower():
+                            args += [
+                                "--no-sandbox", "--disable-dev-shm-usage",
+                                "--disable-gpu", "--no-first-run",
+                                f"--user-data-dir={profile_dir}",
+                            ]
+                        try:
+                            subprocess.Popen(
+                                args,
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL,
+                                env=env, start_new_session=True)
+                            self.after(0, lambda e=exe: self.add_log(
+                                f"✔ Launched: {e}"))
+                            launched = True
+                        except Exception as exc:
+                            self.after(0, lambda x=exc: self.add_log(
+                                f"✘ Could not launch {exe}: {x}"))
+                    else:
+                        self.after(0, lambda: self.add_log(
+                            "✘ No browser found on this system."))
+
+                if launched:
+                    # Wait up to 20 s for a browser window to appear
+                    for _ in range(20):
+                        time.sleep(1)
+                        wid = find_browser_window()
+                        if wid:
+                            self.after(0, lambda: self._update_browser_status(True))
+                            return
+                    self.after(0, lambda: self.add_log(
+                        "⚠ Browser launched but window not detected yet — "
+                        "it will appear after the next status check."))
+
+            finally:
+                # Always re-enable the button, no matter what
+                self.after(0, lambda: self.chrome_btn.configure(
+                    state="normal",
+                    text="🌐  No browser? Launch one here"))
 
         threading.Thread(target=_do, daemon=True).start()
 
