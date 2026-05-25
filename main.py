@@ -750,7 +750,11 @@ class App(ctk.CTk):
                     "   windows first and click Launch again."
                 ))
                 import time
-                time.sleep(3)
+                # Poll every second for up to 15 seconds until CDP responds
+                for _ in range(15):
+                    time.sleep(1)
+                    if chrome_launcher.is_chrome_debug_running(port):
+                        break
                 self.after(0, lambda: self.poll_chrome_status())
             else:
                 self.after(0, lambda: self.add_log(f"✘ {msg}"))

@@ -187,9 +187,18 @@ def launch_chrome(port: int = 9222) -> tuple[bool, str]:
     flags = [
         exe,
         f"--remote-debugging-port={port}",
+        "--remote-debugging-address=127.0.0.1",
         "--no-first-run",
         "--no-default-browser-check",
     ]
+
+    # Required flags for running inside a Linux container / sandbox environment
+    if sys.platform.startswith("linux"):
+        flags += [
+            "--no-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-gpu",
+        ]
 
     env = os.environ.copy()
     if sys.platform.startswith("linux") and not env.get("DISPLAY"):
