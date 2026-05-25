@@ -1,3 +1,11 @@
+import sys
+
+# ── Dependency check (uses only stdlib — runs before third-party imports) ──
+from setup_check import run_setup
+if not run_setup():
+    sys.exit(1)
+
+# ── Third-party imports (safe to load now that deps are verified) ──────────
 import threading
 import customtkinter as ctk
 import datetime
