@@ -49,263 +49,214 @@ class App(ctk.CTk):
 
     def build_ui(self):
         # Configure layout grid (1 Row, 2 Columns)
-        self.grid_columnconfigure(0, weight=4, minsize=400)  # Left panel (Form)
-        self.grid_columnconfigure(1, weight=6, minsize=650)  # Right panel (Grid & Logs)
+        self.grid_columnconfigure(0, weight=4, minsize=420)
+        self.grid_columnconfigure(1, weight=6, minsize=650)
         self.grid_rowconfigure(0, weight=1)
 
         # ==========================
-        # LEFT PANEL: FORM & CONTROLS
+        # LEFT PANEL: TABVIEW
         # ==========================
         left_panel = ctk.CTkFrame(self, corner_radius=15, fg_color="#1e222b")
         left_panel.grid(row=0, column=0, sticky="nsew", padx=15, pady=15)
-        
-        # Grid layout for form elements
+        left_panel.grid_rowconfigure(0, weight=1)
         left_panel.grid_columnconfigure(0, weight=1)
-        
-        # Title
-        form_title = ctk.CTkLabel(
-            left_panel, 
-            text="Account Settings", 
-            font=("Segoe UI", 24, "bold"),
-            text_color="#3b82f6"
-        )
-        form_title.pack(pady=(20, 15))
 
-        # --- SECTION: CREDENTIALS ---
-        cred_frame = ctk.CTkFrame(left_panel, fg_color="#151821")
-        cred_frame.pack(fill="x", padx=15, pady=10)
-        
-        ctk.CTkLabel(cred_frame, text="CREDENTIALS", font=("Segoe UI", 12, "bold"), text_color="#64748b").pack(anchor="w", padx=10, pady=(5, 2))
-        
-        self.email_entry = ctk.CTkEntry(
-            cred_frame, 
-            height=40,
-            placeholder_text="Google Email Address"
+        tabview = ctk.CTkTabview(
+            left_panel,
+            fg_color="#1e222b",
+            segmented_button_fg_color="#151821",
+            segmented_button_selected_color="#2563eb",
+            segmented_button_selected_hover_color="#1d4ed8",
+            segmented_button_unselected_color="#151821",
+            segmented_button_unselected_hover_color="#1e293b",
+            text_color="#e2e8f0",
+            corner_radius=10,
         )
-        self.email_entry.pack(fill="x", padx=10, pady=5)
+        tabview.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
+        tabview.add("📋  Accounts")
+        tabview.add("⚡  Automation")
 
-        self.password_entry = ctk.CTkEntry(
-            cred_frame, 
-            height=40,
-            placeholder_text="Password", 
-            show="*"
-        )
-        self.password_entry.pack(fill="x", padx=10, pady=5)
+        # ── TAB 1: ACCOUNTS FORM ─────────────────────────────────────
+        tab_acc = tabview.tab("📋  Accounts")
+        tab_acc.grid_columnconfigure(0, weight=1)
+
+        # CREDENTIALS section
+        cred_frame = ctk.CTkFrame(tab_acc, fg_color="#151821", corner_radius=8)
+        cred_frame.pack(fill="x", padx=5, pady=(8, 6))
+
+        ctk.CTkLabel(cred_frame, text="CREDENTIALS",
+                     font=("Segoe UI", 11, "bold"), text_color="#64748b"
+                     ).pack(anchor="w", padx=12, pady=(8, 2))
+
+        self.email_entry = ctk.CTkEntry(cred_frame, height=38,
+                                        placeholder_text="Google Email Address")
+        self.email_entry.pack(fill="x", padx=12, pady=4)
+
+        self.password_entry = ctk.CTkEntry(cred_frame, height=38,
+                                           placeholder_text="Password", show="*")
+        self.password_entry.pack(fill="x", padx=12, pady=4)
 
         self.show_password = ctk.BooleanVar()
-        show_pass_chk = ctk.CTkCheckBox(
-            cred_frame, 
-            text="Show Password", 
-            variable=self.show_password, 
-            command=self.toggle_password,
-            font=("Segoe UI", 12)
-        )
-        show_pass_chk.pack(anchor="w", padx=10, pady=5)
+        ctk.CTkCheckBox(cred_frame, text="Show Password",
+                        variable=self.show_password,
+                        command=self.toggle_password,
+                        font=("Segoe UI", 12)
+                        ).pack(anchor="w", padx=12, pady=(2, 8))
 
-        # --- SECTION: 2-FACTOR AUTHENTICATION ---
-        twofa_frame = ctk.CTkFrame(left_panel, fg_color="#151821")
-        twofa_frame.pack(fill="x", padx=15, pady=10)
+        # 2FA section
+        twofa_frame = ctk.CTkFrame(tab_acc, fg_color="#151821", corner_radius=8)
+        twofa_frame.pack(fill="x", padx=5, pady=6)
 
-        ctk.CTkLabel(twofa_frame, text="2-FACTOR AUTHENTICATION (2FA)", font=("Segoe UI", 12, "bold"), text_color="#64748b").pack(anchor="w", padx=10, pady=(5, 2))
+        ctk.CTkLabel(twofa_frame, text="2-FACTOR AUTHENTICATION",
+                     font=("Segoe UI", 11, "bold"), text_color="#64748b"
+                     ).pack(anchor="w", padx=12, pady=(8, 2))
 
         self.twofa_var = ctk.BooleanVar()
         self.twofa_checkbox = ctk.CTkCheckBox(
-            twofa_frame, 
-            text="Enable 2FA Verification", 
-            variable=self.twofa_var,
-            command=self.update_phone_fields,
-            font=("Segoe UI", 13, "bold")
-        )
-        self.twofa_checkbox.pack(anchor="w", padx=10, pady=8)
+            twofa_frame, text="Enable 2FA Verification",
+            variable=self.twofa_var, command=self.update_phone_fields,
+            font=("Segoe UI", 12, "bold"))
+        self.twofa_checkbox.pack(anchor="w", padx=12, pady=6)
 
-        # 2FA Type Option Menu
-        type_subframe = ctk.CTkFrame(twofa_frame, fg_color="transparent")
-        type_subframe.pack(fill="x", padx=10, pady=4)
-        ctk.CTkLabel(type_subframe, text="2FA Method:", font=("Segoe UI", 12)).pack(side="left", padx=5)
-        
+        type_row = ctk.CTkFrame(twofa_frame, fg_color="transparent")
+        type_row.pack(fill="x", padx=12, pady=2)
+        ctk.CTkLabel(type_row, text="2FA Method:", font=("Segoe UI", 12)).pack(side="left")
         self.twofa_type = ctk.StringVar(value="None")
         self.twofa_menu = ctk.CTkOptionMenu(
-            type_subframe,
+            type_row,
             values=["None", "SMS", "Email", "Google Prompt", "Authenticator"],
-            variable=self.twofa_type,
-            command=self.update_phone_fields,
-            width=150
-        )
-        self.twofa_menu.pack(side="right", padx=5)
+            variable=self.twofa_type, command=self.update_phone_fields, width=160)
+        self.twofa_menu.pack(side="right")
 
-        # SMS Fields (Country Code & Phone)
-        phone_subframe = ctk.CTkFrame(twofa_frame, fg_color="transparent")
-        phone_subframe.pack(fill="x", padx=10, pady=5)
-        
-        self.country_code = ctk.CTkEntry(
-            phone_subframe, 
-            width=65, 
-            height=35,
-            placeholder_text="+20"
-        )
-        self.country_code.pack(side="left", padx=5)
-        
-        self.phone_number = ctk.CTkEntry(
-            phone_subframe, 
-            height=35,
-            placeholder_text="Verification Phone"
-        )
-        self.phone_number.pack(side="left", fill="x", expand=True, padx=5)
+        phone_row = ctk.CTkFrame(twofa_frame, fg_color="transparent")
+        phone_row.pack(fill="x", padx=12, pady=4)
+        self.country_code = ctk.CTkEntry(phone_row, width=65, height=34,
+                                         placeholder_text="+20")
+        self.country_code.pack(side="left", padx=(0, 6))
+        self.phone_number = ctk.CTkEntry(phone_row, height=34,
+                                         placeholder_text="Verification Phone")
+        self.phone_number.pack(side="left", fill="x", expand=True)
 
-        # Authenticator Secret field
-        self.totp_secret = ctk.CTkEntry(
-            twofa_frame, 
-            height=35,
-            placeholder_text="Authenticator Secret Key (TOTP)"
-        )
-        self.totp_secret.pack(fill="x", padx=10, pady=(5, 10))
+        self.totp_secret = ctk.CTkEntry(twofa_frame, height=34,
+                                        placeholder_text="Authenticator Secret Key (TOTP)")
+        self.totp_secret.pack(fill="x", padx=12, pady=(2, 10))
 
-        # --- SECTION: FORM BUTTONS ---
-        btn_frame = ctk.CTkFrame(left_panel, fg_color="transparent")
-        btn_frame.pack(fill="x", padx=15, pady=10)
+        # Form action buttons
+        btn_frame = ctk.CTkFrame(tab_acc, fg_color="transparent")
+        btn_frame.pack(fill="x", padx=5, pady=6)
 
         self.add_btn = ctk.CTkButton(
-            btn_frame, 
-            text="Add Account", 
-            command=self.add_new_account,
-            height=38,
-            font=("Segoe UI", 13, "bold"),
-            fg_color="#2563eb",
-            hover_color="#1d4ed8"
-        )
-        self.add_btn.pack(fill="x", pady=4)
+            btn_frame, text="Add Account", command=self.add_new_account,
+            height=40, font=("Segoe UI", 13, "bold"),
+            fg_color="#2563eb", hover_color="#1d4ed8")
+        self.add_btn.pack(fill="x", pady=3)
 
         self.update_btn = ctk.CTkButton(
-            btn_frame, 
-            text="Update Account", 
-            command=self.update_selected_account,
-            height=38,
-            font=("Segoe UI", 13, "bold"),
-            fg_color="#10b981",
-            hover_color="#059669",
-            text_color_disabled="#a7f3d0",
-            state="disabled"
-        )
-        self.update_btn.pack(fill="x", pady=4)
+            btn_frame, text="Update Account", command=self.update_selected_account,
+            height=40, font=("Segoe UI", 13, "bold"),
+            fg_color="#10b981", hover_color="#059669",
+            text_color_disabled="#a7f3d0", state="disabled")
+        self.update_btn.pack(fill="x", pady=3)
 
         self.clear_btn = ctk.CTkButton(
-            btn_frame, 
-            text="Clear Form", 
-            command=self.clear_inputs,
-            height=35,
-            font=("Segoe UI", 12),
-            fg_color="#475569",
-            hover_color="#334155"
-        )
-        self.clear_btn.pack(fill="x", pady=4)
+            btn_frame, text="Clear Form", command=self.clear_inputs,
+            height=34, font=("Segoe UI", 12),
+            fg_color="#475569", hover_color="#334155")
+        self.clear_btn.pack(fill="x", pady=3)
 
-        # --- SECTION: AUTOMATION ENGINE CONTROLS ---
-        engine_frame = ctk.CTkFrame(left_panel, fg_color="#151821")
-        engine_frame.pack(fill="both", expand=True, padx=15, pady=(10, 15))
+        # ── TAB 2: AUTOMATION ────────────────────────────────────────
+        tab_auto = tabview.tab("⚡  Automation")
+        tab_auto.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(
-            engine_frame, text="AUTOMATION CONTROLS",
-            font=("Segoe UI", 12, "bold"), text_color="#64748b"
-        ).pack(anchor="w", padx=10, pady=(8, 4))
-
-        # ── STEP 1: Connect Chrome ────────────────────────────────────
-        step1_card = ctk.CTkFrame(engine_frame, fg_color="#0f172a", corner_radius=8)
-        step1_card.pack(fill="x", padx=10, pady=(0, 6))
+        # STEP 1 — Chrome connection
+        step1_card = ctk.CTkFrame(tab_auto, fg_color="#151821", corner_radius=10)
+        step1_card.pack(fill="x", padx=5, pady=(8, 6))
 
         step1_hdr = ctk.CTkFrame(step1_card, fg_color="transparent")
-        step1_hdr.pack(fill="x", padx=10, pady=(6, 2))
+        step1_hdr.pack(fill="x", padx=12, pady=(10, 4))
 
-        ctk.CTkLabel(
-            step1_hdr, text="STEP 1",
-            font=("Segoe UI", 9, "bold"), text_color="#4f46e5", width=46
-        ).pack(side="left")
+        ctk.CTkLabel(step1_hdr, text="STEP 1 — Connect Chrome",
+                     font=("Segoe UI", 13, "bold"), text_color="#6366f1"
+                     ).pack(side="left")
 
-        # Status dot + text side by side
+        status_row = ctk.CTkFrame(step1_card, fg_color="#0f172a", corner_radius=6)
+        status_row.pack(fill="x", padx=12, pady=(0, 8))
+
         self.chrome_dot = ctk.CTkLabel(
-            step1_hdr, text="●",
-            font=("Segoe UI", 16), text_color="#64748b", width=20
-        )
-        self.chrome_dot.pack(side="left", padx=(4, 2))
+            status_row, text="●", font=("Segoe UI", 20),
+            text_color="#64748b", width=28)
+        self.chrome_dot.pack(side="left", padx=(10, 4), pady=8)
 
         self.chrome_status_lbl = ctk.CTkLabel(
-            step1_hdr, text="Chrome: checking…",
-            font=("Segoe UI", 11, "bold"), text_color="#94a3b8", anchor="w"
-        )
-        self.chrome_status_lbl.pack(side="left")
+            status_row, text="Chrome: checking…",
+            font=("Segoe UI", 12, "bold"), text_color="#94a3b8", anchor="w")
+        self.chrome_status_lbl.pack(side="left", pady=8)
+
+        ctk.CTkLabel(step1_card,
+                     text="Close ALL Chrome windows first, then click below:",
+                     font=("Segoe UI", 10), text_color="#64748b"
+                     ).pack(anchor="w", padx=12)
 
         self.chrome_btn = ctk.CTkButton(
-            step1_card,
-            text="Launch Chrome with Debug Port",
+            step1_card, text="Launch Chrome with Debug Port",
             command=self.launch_chrome_browser,
-            height=36,
-            font=("Segoe UI", 12, "bold"),
-            fg_color="#4f46e5",
-            hover_color="#4338ca",
-        )
-        self.chrome_btn.pack(fill="x", padx=10, pady=(4, 8))
+            height=40, font=("Segoe UI", 13, "bold"),
+            fg_color="#4f46e5", hover_color="#4338ca")
+        self.chrome_btn.pack(fill="x", padx=12, pady=(6, 12))
 
-        # ── STEP 2: Select accounts above, then start ─────────────────
-        step2_card = ctk.CTkFrame(engine_frame, fg_color="#0f172a", corner_radius=8)
-        step2_card.pack(fill="x", padx=10, pady=(0, 6))
+        # STEP 2 — Run automation
+        step2_card = ctk.CTkFrame(tab_auto, fg_color="#151821", corner_radius=10)
+        step2_card.pack(fill="x", padx=5, pady=6)
 
-        step2_hdr = ctk.CTkFrame(step2_card, fg_color="transparent")
-        step2_hdr.pack(fill="x", padx=10, pady=(6, 2))
+        ctk.CTkLabel(step2_card, text="STEP 2 — Run Automation",
+                     font=("Segoe UI", 13, "bold"), text_color="#16a34a"
+                     ).pack(anchor="w", padx=12, pady=(10, 2))
 
-        ctk.CTkLabel(
-            step2_hdr, text="STEP 2",
-            font=("Segoe UI", 9, "bold"), text_color="#16a34a"
-        ).pack(side="left")
-
-        ctk.CTkLabel(
-            step2_hdr,
-            text="  Check accounts (right panel) → Start",
-            font=("Segoe UI", 10), text_color="#64748b"
-        ).pack(side="left")
+        ctk.CTkLabel(step2_card,
+                     text="Go to the 'Accounts' tab or the right panel,\n"
+                          "check the accounts you want, then press Start.",
+                     font=("Segoe UI", 10), text_color="#64748b", justify="left"
+                     ).pack(anchor="w", padx=12, pady=(0, 8))
 
         self.start_btn = ctk.CTkButton(
-            step2_card,
-            text="Start Automated Login",
+            step2_card, text="▶  Start Automated Login",
             command=self.start_login_process,
-            height=40,
-            font=("Segoe UI", 13, "bold"),
-            fg_color="#16a34a",
-            hover_color="#15803d",
-            text_color_disabled="#4b7a57",
-            state="disabled"
-        )
-        self.start_btn.pack(fill="x", padx=10, pady=(4, 4))
+            height=44, font=("Segoe UI", 14, "bold"),
+            fg_color="#16a34a", hover_color="#15803d",
+            text_color_disabled="#4b7a57", state="disabled")
+        self.start_btn.pack(fill="x", padx=12, pady=(0, 6))
 
         self.stop_btn = ctk.CTkButton(
-            step2_card,
-            text="Stop Automation",
+            step2_card, text="⏹  Stop Automation",
             command=self.stop_login_process,
-            height=34,
-            font=("Segoe UI", 12, "bold"),
-            fg_color="#7f1d1d",
-            hover_color="#991b1b",
-            text_color_disabled="#fecaca",
-            state="disabled"
-        )
-        self.stop_btn.pack(fill="x", padx=10, pady=(0, 8))
+            height=36, font=("Segoe UI", 12, "bold"),
+            fg_color="#7f1d1d", hover_color="#991b1b",
+            text_color_disabled="#fecaca", state="disabled")
+        self.stop_btn.pack(fill="x", padx=12, pady=(0, 12))
 
-        # ── Settings ──────────────────────────────────────────────────
+        # Settings card
+        settings_card = ctk.CTkFrame(tab_auto, fg_color="#151821", corner_radius=10)
+        settings_card.pack(fill="x", padx=5, pady=6)
+
+        ctk.CTkLabel(settings_card, text="BOT SETTINGS",
+                     font=("Segoe UI", 11, "bold"), text_color="#64748b"
+                     ).pack(anchor="w", padx=12, pady=(8, 4))
+
+        ctk.CTkLabel(settings_card,
+                     text="Typing speed · Typo simulation · 2FA timeout · Account gap delay",
+                     font=("Segoe UI", 10), text_color="#475569", wraplength=340, justify="left"
+                     ).pack(anchor="w", padx=12, pady=(0, 6))
+
         self.settings_btn = ctk.CTkButton(
-            engine_frame,
-            text="⚙  Settings",
+            settings_card, text="⚙  Open Settings",
             command=self.open_settings,
-            height=32,
-            font=("Segoe UI", 11),
-            fg_color="#1e293b",
-            hover_color="#334155",
-            border_width=1,
-            border_color="#334155",
-        )
-        self.settings_btn.pack(fill="x", padx=10, pady=(0, 8))
+            height=36, font=("Segoe UI", 12),
+            fg_color="#1e293b", hover_color="#334155",
+            border_width=1, border_color="#475569")
+        self.settings_btn.pack(fill="x", padx=12, pady=(0, 12))
 
-        # Set initial input field states
+        # Init field states + start poller
         self.update_phone_fields()
-
-        # Kick off the Chrome status poller (runs every 3 s)
         self.after(500, self.poll_chrome_status)
 
         # ==========================
